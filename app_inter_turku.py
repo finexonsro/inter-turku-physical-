@@ -69,7 +69,7 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 html,body,[class*="css"]{{font-family:'Barlow',sans-serif;background:{BLACK};color:{WHITE};}}
 .main{{background:{BLACK};}}
-.block-container{{padding-top:1.5rem !important;max-width:1400px;}}
+.block-container{{padding-top:2.5rem !important;max-width:1400px;}}
 [data-testid="stSidebar"]{{background:{DARK};border-right:2px solid {BLUE};}}
 [data-testid="stSidebar"] label{{color:{MUTED} !important;font-size:10px !important;
     letter-spacing:0.15em;text-transform:uppercase;font-weight:700 !important;}}
@@ -257,7 +257,7 @@ with st.sidebar:
 
     st.markdown('<div class="div"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sec">Benchmark</div>', unsafe_allow_html=True)
-    bench_options = ["Veikkausliiga 2025", "Veikkausliiga All", "Top 5 2025/26"]
+    bench_options = ["Veikkausliiga 2025", "Veikkausliiga All", "Top 5 2025/26", "FC Inter Turku 2025", "FC Inter Turku 2026"]
     sel_bench = st.selectbox("Reference", bench_options)
 
 # ── BENCHMARK SELECTION ───────────────────────────────────────────────────────
@@ -265,6 +265,10 @@ if sel_bench == "Veikkausliiga 2025":
     bench_df = vk[vk['season'] == '2025']
 elif sel_bench == "Top 5 2025/26" and t5 is not None:
     bench_df = t5
+elif sel_bench == "FC Inter Turku 2025":
+    bench_df = vk[(vk['Team'] == 'FC Inter Turku') & (vk['season'] == '2025')]
+elif sel_bench == "FC Inter Turku 2026":
+    bench_df = vk[(vk['Team'] == 'FC Inter Turku') & (vk['season'] == '2026')]
 else:
     bench_df = vk
 
@@ -488,9 +492,12 @@ with tab2:
         vals = [s,b,o,p,s]
         lbls = ['Speed','Burst','OTIP','BIP','Speed']
         fig = go.Figure()
+        # Benchmark median line at 50%
         fig.add_trace(go.Scatterpolar(r=[50,50,50,50,50], theta=lbls,
-            mode='lines', line=dict(color=MUTED,width=1,dash='dot'),
-            showlegend=False, hoverinfo='skip'))
+            fill='toself', fillcolor='rgba(255,255,255,0.03)',
+            line=dict(color='rgba(255,255,255,0.3)',width=1.5,dash='dot'),
+            name=f'Benchmark Median ({sel_bench})',
+            hovertemplate='Median: <b>50%</b><extra></extra>'))
         fig.add_trace(go.Scatterpolar(r=vals, theta=lbls, fill='toself',
             fillcolor=f'rgba(27,108,168,0.2)',
             line=dict(color=BLUE,width=2.5),
@@ -505,7 +512,10 @@ with tab2:
                 angularaxis=dict(tickfont=dict(color=WHITE,size=11),
                     gridcolor='#2A2A2A')),
             paper_bgcolor=BLACK,font=dict(color=WHITE,family='Barlow'),
-            showlegend=False,margin=dict(l=50,r=50,t=30,b=30),height=320)
+            showlegend=True,
+            legend=dict(bgcolor=CARD,bordercolor='#2A2A2A',borderwidth=1,
+                font=dict(size=10),orientation='h',y=-0.15,x=0.5,xanchor='center'),
+            margin=dict(l=50,r=50,t=30,b=60),height=360)
         st.plotly_chart(fig, use_container_width=True)
 
 # ── TAB 3: COMPARE ────────────────────────────────────────────────────────────
@@ -646,6 +656,36 @@ with tab4:
                             <div class="layer-level" style="color:{clr};">{lbl}</div>
                         </div>
                         """, unsafe_allow_html=True)
+
+                # Radar for ad-hoc
+                if any(x > 0 for x in [s,b,o,p]):
+                    vals = [s,b,o,p,s]
+                    lbls = ['Speed','Burst','OTIP','BIP','Speed']
+                    fig_a = go.Figure()
+                    fig_a.add_trace(go.Scatterpolar(r=[50,50,50,50,50], theta=lbls,
+                        fill='toself', fillcolor='rgba(255,255,255,0.03)',
+                        line=dict(color='rgba(255,255,255,0.3)',width=1.5,dash='dot'),
+                        name=f'Benchmark Median ({sel_bench})',
+                        hovertemplate='Median: <b>50%</b><extra></extra>'))
+                    fig_a.add_trace(go.Scatterpolar(r=vals, theta=lbls, fill='toself',
+                        fillcolor='rgba(27,108,168,0.2)',
+                        line=dict(color=BLUE,width=2.5),
+                        name=a_row.get('Player','—'),
+                        hovertemplate='%{theta}: <b>%{r:.0f}%</b><extra></extra>'))
+                    fig_a.update_layout(
+                        polar=dict(bgcolor=CARD,
+                            radialaxis=dict(visible=True,range=[0,100],
+                                tickvals=[25,50,75,100],ticktext=['25%','50%','75%','100%'],
+                                tickfont=dict(color=MUTED,size=9),
+                                gridcolor='#2A2A2A',linecolor='#2A2A2A'),
+                            angularaxis=dict(tickfont=dict(color=WHITE,size=11),
+                                gridcolor='#2A2A2A')),
+                        paper_bgcolor=BLACK,font=dict(color=WHITE,family='Barlow'),
+                        showlegend=True,
+                        legend=dict(bgcolor=CARD,bordercolor='#2A2A2A',borderwidth=1,
+                            font=dict(size=10),orientation='h',y=-0.15,x=0.5,xanchor='center'),
+                        margin=dict(l=50,r=50,t=30,b=60),height=360)
+                    st.plotly_chart(fig_a, use_container_width=True)
         except Exception as e:
             st.error(f"Error: {e}")
 
