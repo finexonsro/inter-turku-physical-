@@ -145,8 +145,8 @@ html,body,[class*="css"]{{
 # ── DATA LOADING ──────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    vk = pd.read_csv("data/veikkausliiga.csv", sep=';', decimal=',')
-    t5 = pd.read_csv("data/top5.csv", sep=';', decimal=',') if __import__('os').path.exists("data/top5.csv") else None
+    vk = pd.read_csv("veikkausliiga.csv", sep=';', decimal=',')
+    t5 = pd.read_csv("top5.csv", sep=';', decimal=',') if __import__('os').path.exists("top5.csv") else None
 
     # Position mapping
     vk['position'] = vk['Position Group'].map(POS_MAP)
