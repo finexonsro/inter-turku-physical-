@@ -1072,19 +1072,23 @@ with tab5:
                         if n_above < n_layers: continue
 
                         s,b,o,p2 = (layer_scores.get(k,0) or 0 for k in ['speed','burst','otip','bip'])
+                        age_p2 = player.get('age', np.nan)
                         t5_rows.append({
-                            'Player':   player.get('Player','—'),
-                            'Team':     player.get('Team','—'),
-                            'Position': POS_EN.get(pos_p, pos_p),
-                            'Season':   player.get('season','—'),
-                            'Age':      round(player.get('age', np.nan), 1) if pd.notna(player.get('age', np.nan)) else np.nan,
-                            'Minutes':  int(player.get('total_minutes',0) or 0),
-                            'speed':    layer_scores.get('speed', np.nan),
-                            'burst':    layer_scores.get('burst', np.nan),
-                            'otip':     layer_scores.get('otip',  np.nan),
-                            'bip':      layer_scores.get('bip',   np.nan),
-                            'Profile':  get_profile(s,b,o,p2),
-                            '_pos':     pos_p,
+                            'Player':        player.get('Player','—'),
+                            'Team':          player.get('Team','—'),
+                            'Position':      POS_EN.get(pos_p, pos_p),
+                            'Season':        player.get('season','—'),
+                            'Age':           round(age_p2,1) if pd.notna(age_p2) else np.nan,
+                            'Minutes':       int(player.get('total_minutes',0) or 0),
+                            'speed':         layer_scores.get('speed', np.nan),
+                            'burst':         layer_scores.get('burst', np.nan),
+                            'otip':          layer_scores.get('otip',  np.nan),
+                            'bip':           layer_scores.get('bip',   np.nan),
+                            'Profile':       get_profile(s,b,o,p2),
+                            '_pos':          pos_p,
+                            '_season':       player.get('season','—'),
+                            '_total_minutes':int(player.get('total_minutes',0) or 0),
+                            '_age':          age_p2,
                         })
 
                 filtered = pd.DataFrame(t5_rows)
@@ -1118,6 +1122,10 @@ with tab5:
 
         # ── RESULTS TABLE ─────────────────────────────────────────────────────
         if not filtered.empty:
+            # Ensure all required columns exist
+            for req_col in ['Age','speed','burst','otip','bip','Profile']:
+                if req_col not in filtered.columns:
+                    filtered[req_col] = np.nan
             display = filtered[['Player','Team','Position','Season','Age','Minutes',
                                 'speed','burst','otip','bip','Profile']].copy()
             display.columns = ['Player','Team','Position','Season','Age','Minutes',
