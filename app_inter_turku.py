@@ -1099,6 +1099,9 @@ with tab5:
 
                 filtered = pd.DataFrame(t5_rows)
                 pool_df  = filtered
+                # Debug
+                if not filtered.empty:
+                    st.write("DEBUG first row:", filtered.iloc[0][['Player','speed','burst','otip','bip']].to_dict())
                 st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players ≥ {t5_threshold}% vs Top 5 in ≥ {n_layers} layers</div>', unsafe_allow_html=True)
 
         # ── MODE 3: Custom Filter ─────────────────────────────────────────────
