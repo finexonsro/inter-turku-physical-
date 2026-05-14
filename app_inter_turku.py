@@ -311,20 +311,27 @@ def build_scores_df(bench_df_local):
         })
     return pd.DataFrame(rows)
 
+vk, t5 = load_data()
+
 def get_scores_df(bench_source):
     """Get cached scores — uses session_state keyed by bench_source."""
     key = f"scores_{bench_source}"
     if key not in st.session_state:
         if bench_source == "t5" and t5 is not None:
-            st.session_state[key] = build_scores_df(t5)
+            # Ensure t5 numeric columns converted
+            t5_num = t5.copy()
+            for col in t5_num.columns:
+                if col not in ['Player','Short Name','Team','Competition','Season',
+                               'Position Group','Birthdate','Player ID','Team ID',
+                               'Competition ID','Season ID','position','season','total_minutes','age']:
+                    t5_num[col] = pd.to_numeric(t5_num[col], errors='coerce')
+            st.session_state[key] = build_scores_df(t5_num)
         else:
             st.session_state[key] = build_scores_df(vk)
     return st.session_state[key]
 
 def calc_all_scores(vk_hash, bench_source, t5_hash="none"):
     return get_scores_df(bench_source)
-
-vk, t5 = load_data()
 
 # ── CALC FUNCTIONS ────────────────────────────────────────────────────────────
 def calc_layer_scores(player_row, bench_df, position):
@@ -480,8 +487,12 @@ with tab1:
         result_df = result_df.rename(columns={
             'speed': '⚡ Speed', 'burst': '🚀 Burst',
             'otip':  '🏃 OTIP',  'bip':   '💥 BIP',
-            'Age':   'Age',
         })
+        # Only show relevant columns
+        show_cols = [c for c in ['Player','Team','Position','Season','Age','Minutes',
+                                  '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
+                     if c in result_df.columns]
+        result_df = result_df[show_cols]
 
         def color_val(v):
             if pd.isna(v): return f'color:{MUTED}'
@@ -1040,7 +1051,13 @@ with tab5:
                 # Calculate directly against t5 benchmark — no caching
                 with st.spinner("Calculating vs Top 5..."):
                     t5_rows = []
-                    bench_t5 = t5  # explicit reference
+                    # Ensure numeric conversion for t5
+                    bench_t5 = t5.copy()
+                    for col in bench_t5.columns:
+                        if col not in ['Player','Short Name','Team','Competition','Season',
+                                       'Position Group','Birthdate','Player ID','Team ID',
+                                       'Competition ID','Season ID','position','season']:
+                            bench_t5[col] = pd.to_numeric(bench_t5[col], errors='coerce')
                     for _, player in vk.iterrows():
                         pos_p = player.get('position')
                         if not pos_p: continue
