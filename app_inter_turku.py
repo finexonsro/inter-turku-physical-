@@ -162,6 +162,100 @@ def get_layer_metrics():
         ],
     }
 
+# ── HTML EXPORT ──────────────────────────────────────────────────────────────
+def make_player_report(player_row, bench_df, sel_bench, scores, all_data, profile):
+    pos    = player_row.get('position','')
+    mins   = int(player_row.get('total_minutes',0) or 0)
+    s = scores.get('speed',0) or 0
+    b = scores.get('burst',0) or 0
+    o = scores.get('otip', 0) or 0
+    p = scores.get('bip',  0) or 0
+
+    def level_html(score):
+        lbl, clr = get_level(score)
+        return f'<span style="color:{clr};font-weight:700;">{lbl}</span>'
+
+    def bar_rows(layer):
+        color = LAYER_COLORS[layer]
+        data  = all_data.get(layer,[])
+        rows  = ''
+        for _,name,unit,val,pct,_ in data:
+            rows += f"""<tr>
+                <td style="padding:5px 8px;font-size:11px;color:#888;">{name}</td>
+                <td style="padding:5px 8px;width:150px;">
+                    <div style="background:#222;border-radius:3px;height:6px;">
+                        <div style="background:{color};width:{pct:.0f}%;height:6px;border-radius:3px;"></div>
+                    </div>
+                </td>
+                <td style="padding:5px 8px;font-size:11px;">{val:.2f} {unit}</td>
+                <td style="padding:5px 8px;font-size:11px;color:#888;">{pct:.0f}%</td>
+            </tr>"""
+        return rows
+
+    layer_cards = ''
+    for layer, score in [('speed',s),('burst',b),('otip',o),('bip',p)]:
+        color = LAYER_COLORS[layer]
+        lbl, clr = get_level(score)
+        layer_cards += f"""<div style="background:#1A1A1A;border:1px solid #2A2A2A;
+            border-top:3px solid {color};border-radius:4px;padding:14px;text-align:center;">
+            <div style="font-size:9px;color:#666;letter-spacing:0.2em;text-transform:uppercase;">
+                {LAYER_LABELS[layer]}</div>
+            <div style="font-family:monospace;font-size:36px;font-weight:800;
+                color:{color};line-height:1.1;">{score:.0f}%</div>
+            <div style="font-size:10px;color:#666;margin:2px 0;">vs {sel_bench}</div>
+            <div style="font-size:12px;font-weight:700;color:{clr};">{lbl}</div>
+        </div>"""
+
+    breakdown = ''
+    for layer in ['speed','burst','otip','bip']:
+        color = LAYER_COLORS[layer]
+        sc    = scores.get(layer,0) or 0
+        breakdown += f"""<div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:11px;color:{color};font-weight:700;letter-spacing:0.1em;">
+                    {LAYER_LABELS[layer]} — {LAYER_DESC[layer]}</span>
+                <span style="font-family:monospace;font-size:16px;font-weight:700;color:{color};">
+                    {sc:.0f}%</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">{bar_rows(layer)}</table>
+        </div>"""
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Physical Report — {player_row.get('Player','—')}</title>
+<style>
+body{{font-family:Arial,sans-serif;margin:0;padding:24px;background:#111;color:#fff;max-width:900px;margin:0 auto;}}
+</style></head><body>
+<div style="background:#1A1A1A;border:1px solid #2A2A2A;border-left:4px solid {BLUE};
+    border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+            <div style="font-size:22px;font-weight:800;">{player_row.get('Player','—')}</div>
+            <div style="font-size:11px;color:#666;margin-top:3px;">
+                {player_row.get('Team','—')} · {player_row.get('Competition','—')} ·
+                {POS_EN.get(pos,pos)} · {player_row.get('season','—')} · {mins} min total
+            </div>
+        </div>
+        <div style="background:rgba(27,108,168,0.2);border:1px solid {BLUE};
+            border-radius:3px;padding:6px 14px;font-size:12px;font-weight:700;">
+            {profile}</div>
+    </div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+    {layer_cards}
+</div>
+<div style="background:#1A1A1A;border:1px solid #2A2A2A;border-radius:4px;padding:16px;">
+    <div style="font-size:9px;color:{BLUE};letter-spacing:0.2em;text-transform:uppercase;
+        border-bottom:1px solid #2A2A2A;padding-bottom:5px;margin-bottom:12px;">
+        Physical Breakdown · Benchmark: {sel_bench}</div>
+    {breakdown}
+</div>
+<div style="text-align:right;font-size:9px;color:#444;margin-top:16px;letter-spacing:0.15em;
+    text-transform:uppercase;">
+    FC Inter Turku · Physical Layer Framework · BTL Scouting Intelligence ·
+    {datetime.now().strftime('%d.%m.%Y')}
+</div>
+</body></html>"""
+
 # ── DATA ──────────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
@@ -377,7 +471,7 @@ with tab2:
     # All entries including duplicates across positions/seasons
     all_entries = vk.copy()
     all_entries['entry_label'] = all_entries.apply(
-        lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r['season']} ({int(r['total_minutes'] or 0)} min total)",
+        lambda r: f"{r['Player']} — {r.get('Team','—')} — {POS_EN.get(r['position'],r['position'])} — {r['season']} ({int(r['total_minutes'] or 0)} min total)",
         axis=1)
     all_entries = all_entries[all_entries['total_minutes'].fillna(0) > 0]
 
@@ -518,10 +612,21 @@ with tab2:
                     gridcolor='#2A2A2A')),
             paper_bgcolor=BLACK,font=dict(color=WHITE,family='Barlow'),
             showlegend=True,
-            legend=dict(bgcolor=CARD,bordercolor='#2A2A2A',borderwidth=1,
-                font=dict(size=10),orientation='h',y=-0.15,x=0.5,xanchor='center'),
-            margin=dict(l=50,r=50,t=30,b=60),height=360)
+            legend=dict(bgcolor='rgba(26,26,26,0.95)',bordercolor=RED,borderwidth=1,
+                font=dict(size=12,color=WHITE),orientation='h',y=-0.18,x=0.5,xanchor='center'),
+            margin=dict(l=50,r=50,t=30,b=70),height=380)
         st.plotly_chart(fig, use_container_width=True)
+
+        # ── EXPORT ─────────────────────────────────────────────────────────────
+        st.markdown('<div class="div" style="margin:16px 0 8px;"></div>', unsafe_allow_html=True)
+        if st.button("📄 Export Player Report (HTML)"):
+            html = make_player_report(player_row, bench_df, sel_bench, scores, all_data, profile)
+            st.download_button(
+                label="⬇️ Download HTML Report",
+                data=html,
+                file_name=f"physical_report_{player_row.get('Player','player').replace(' ','_')}.html",
+                mime="text/html"
+            )
 
 # ── TAB 3: COMPARE ────────────────────────────────────────────────────────────
 with tab3:
@@ -626,7 +731,7 @@ with tab4:
                 adhoc['Count Performances (Physical Check passed)'].fillna(0)
             ).round(0).astype(int)
             adhoc['entry_label'] = adhoc.apply(
-                lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r.get('Season','—')} ({int(r['total_minutes'] or 0)} min total)",
+                lambda r: f"{r['Player']} — {r.get('Team','—')} — {POS_EN.get(r['position'],r['position'])} — {r.get('Season','—')} ({int(r['total_minutes'] or 0)} min total)",
                 axis=1)
 
             st.success(f"✅ {len(adhoc)} player entries loaded")
@@ -695,6 +800,16 @@ with tab4:
                             font=dict(size=10),orientation='h',y=-0.15,x=0.5,xanchor='center'),
                         margin=dict(l=50,r=50,t=30,b=60),height=360)
                     st.plotly_chart(fig_a, use_container_width=True)
+                # Export button
+                if st.button("📄 Export Report (HTML)", key="adhoc_export"):
+                    html = make_player_report(a_row, bench_df, sel_bench, scores_a, all_data_a, prof_a)
+                    st.download_button(
+                        label="⬇️ Download HTML Report",
+                        data=html,
+                        file_name=f"physical_report_{a_row.get('Player','player').replace(' ','_')}.html",
+                        mime="text/html",
+                        key="adhoc_dl"
+                    )
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -758,6 +873,6 @@ with tab5:
 st.markdown(f"""
 <div style="text-align:center;color:{MUTED};font-size:9px;letter-spacing:0.2em;
             text-transform:uppercase;margin-top:32px;border-top:1px solid #222;padding-top:12px;">
-    FC Inter Turku · Physical Layer Framework · {datetime.now().strftime('%Y')} · Powered by SkillCorner
+    FC Inter Turku · Physical Layer Framework · {datetime.now().strftime('%Y')} · Powered by BTL Scouting Intelligence
 </div>
 """, unsafe_allow_html=True)
