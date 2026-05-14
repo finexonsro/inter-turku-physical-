@@ -175,6 +175,11 @@ def load_data():
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         df['position'] = df['Position Group'].map(POS_MAP)
         df['season']   = df['Season'].str[:4]
+        # Total minutes = avg minutes per game × number of games
+        df['total_minutes'] = (
+            df['Minutes'].fillna(0) *
+            df['Count Performances (Physical Check passed)'].fillna(0)
+        ).round(0).astype(int)
         return df
 
     vk = parse_csv("veikkausliiga.csv")
@@ -253,7 +258,7 @@ with st.sidebar:
     teams = sorted(vk['Team'].dropna().unique().tolist())
     sel_team = st.selectbox("Team", ["All"] + teams)
 
-    min_minutes = st.slider("Min. Total Minutes", 0, 3000, 300, 100)
+    min_minutes = st.slider("Min. Total Minutes", 0, 5000, 300, 100)
 
     st.markdown('<div class="div"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sec">Benchmark</div>', unsafe_allow_html=True)
@@ -280,7 +285,7 @@ if sel_pos != "All":
     df_f = df_f[df_f['position'] == sel_pos]
 if sel_team != "All":
     df_f = df_f[df_f['Team'] == sel_team]
-df_f = df_f[df_f['Minutes'].fillna(0) >= min_minutes]
+df_f = df_f[df_f['total_minutes'].fillna(0) >= min_minutes]
 
 # ── HEADER ────────────────────────────────────────────────────────────────────
 hc1, hc2 = st.columns([1,8])
@@ -331,7 +336,7 @@ with tab1:
                 'Team':      player.get('Team','—'),
                 'Position':  POS_EN.get(pos,pos),
                 'Season':    player.get('season','—'),
-                'Minutes':   int(player.get('Minutes',0) or 0),
+                'Minutes':   int(player.get('total_minutes',0) or 0),
                 '⚡ Speed':  s,
                 '🚀 Burst':  b,
                 '🏃 OTIP':   o,
@@ -372,9 +377,9 @@ with tab2:
     # All entries including duplicates across positions/seasons
     all_entries = vk.copy()
     all_entries['entry_label'] = all_entries.apply(
-        lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r['season']} ({int(r['Minutes'] or 0)} min)",
+        lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r['season']} ({int(r['total_minutes'] or 0)} min total)",
         axis=1)
-    all_entries = all_entries[all_entries['Minutes'].fillna(0) > 0]
+    all_entries = all_entries[all_entries['total_minutes'].fillna(0) > 0]
 
     default_idx = 0
     if 'sel_player' in st.session_state:
@@ -394,7 +399,7 @@ with tab2:
     p = scores.get('bip',  0) or 0
 
     # Header
-    mins = int(player_row.get('Minutes',0) or 0)
+    mins = int(player_row.get('total_minutes',0) or 0)
     st.markdown(f"""
     <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
                 border-radius:4px;padding:14px 18px;margin-bottom:16px;">
@@ -492,10 +497,10 @@ with tab2:
         vals = [s,b,o,p,s]
         lbls = ['Speed','Burst','OTIP','BIP','Speed']
         fig = go.Figure()
-        # Benchmark median line at 50%
+        # Benchmark median line at 50% - red for contrast
         fig.add_trace(go.Scatterpolar(r=[50,50,50,50,50], theta=lbls,
-            fill='toself', fillcolor='rgba(255,255,255,0.03)',
-            line=dict(color='rgba(255,255,255,0.3)',width=1.5,dash='dot'),
+            fill='toself', fillcolor='rgba(204,34,41,0.05)',
+            line=dict(color=RED,width=1.5,dash='dot'),
             name=f'Benchmark Median ({sel_bench})',
             hovertemplate='Median: <b>50%</b><extra></extra>'))
         fig.add_trace(go.Scatterpolar(r=vals, theta=lbls, fill='toself',
@@ -616,8 +621,12 @@ with tab4:
                                'Competition ID','Season ID']:
                     adhoc[col] = pd.to_numeric(adhoc[col], errors='coerce')
             adhoc['position'] = adhoc['Position Group'].map(POS_MAP)
+            adhoc['total_minutes'] = (
+                adhoc['Minutes'].fillna(0) *
+                adhoc['Count Performances (Physical Check passed)'].fillna(0)
+            ).round(0).astype(int)
             adhoc['entry_label'] = adhoc.apply(
-                lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r.get('Season','—')} ({int(r['Minutes'] or 0)} min)",
+                lambda r: f"{r['Player']} — {POS_EN.get(r['position'],r['position'])} — {r.get('Season','—')} ({int(r['total_minutes'] or 0)} min total)",
                 axis=1)
 
             st.success(f"✅ {len(adhoc)} player entries loaded")
@@ -663,8 +672,8 @@ with tab4:
                     lbls = ['Speed','Burst','OTIP','BIP','Speed']
                     fig_a = go.Figure()
                     fig_a.add_trace(go.Scatterpolar(r=[50,50,50,50,50], theta=lbls,
-                        fill='toself', fillcolor='rgba(255,255,255,0.03)',
-                        line=dict(color='rgba(255,255,255,0.3)',width=1.5,dash='dot'),
+                        fill='toself', fillcolor='rgba(204,34,41,0.05)',
+                        line=dict(color=RED,width=1.5,dash='dot'),
                         name=f'Benchmark Median ({sel_bench})',
                         hovertemplate='Median: <b>50%</b><extra></extra>'))
                     fig_a.add_trace(go.Scatterpolar(r=vals, theta=lbls, fill='toself',
