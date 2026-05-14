@@ -1036,9 +1036,10 @@ with tab5:
             st.markdown(f'<div style="font-size:11px;color:{MUTED};margin-bottom:12px;">Players benchmarked against Top 5 leagues — shows who could compete at the highest level physically.</div>', unsafe_allow_html=True)
 
             if t5 is None:
-                st.warning("Top 5 data not loaded. Add top5.csv to enable this mode.")
+                st.error("⚠️ top5.csv not loaded — file not found")
                 filtered = pd.DataFrame()
             else:
+                st.info(f"✅ Top 5 data loaded: {len(t5)} players, positions: {t5['position'].value_counts().to_dict()}")
                 t5_threshold = st.slider("Min. percentile vs Top 5 (in ≥ N layers)", 30, 80, 50, 5)
                 n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
 
