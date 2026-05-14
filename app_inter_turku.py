@@ -490,9 +490,11 @@ with tab1:
 
         for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
             if col in result_df.columns:
-                result_df[col] = result_df[col].round(0)
+                result_df[col] = result_df[col].apply(
+                    lambda x: int(round(x)) if pd.notna(x) else None)
         if 'Age' in result_df.columns:
-            result_df['Age'] = result_df['Age'].round(1)
+            result_df['Age'] = result_df['Age'].apply(
+                lambda x: round(x,1) if pd.notna(x) else None)
 
         def bold_high(v):
             try:
@@ -1076,7 +1078,11 @@ with tab5:
                                      layer_scores.get(l,0) >= t5_threshold)
                         if n_above < n_layers: continue
 
-                        s,b,o,p2 = (layer_scores.get(k,0) or 0 for k in ['speed','burst','otip','bip'])
+                        s  = layer_scores.get('speed', np.nan)
+                        b  = layer_scores.get('burst', np.nan)
+                        o  = layer_scores.get('otip',  np.nan)
+                        p2 = layer_scores.get('bip',   np.nan)
+                        s0,b0,o0,p0 = (x if pd.notna(x) else 0 for x in [s,b,o,p2])
                         age_p2 = player.get('age', np.nan)
                         t5_rows.append({
                             'Player':        player.get('Player','—'),
@@ -1085,11 +1091,11 @@ with tab5:
                             'Season':        player.get('season','—'),
                             'Age':           round(age_p2,1) if pd.notna(age_p2) else np.nan,
                             'Minutes':       int(player.get('total_minutes',0) or 0),
-                            'speed':         layer_scores.get('speed', np.nan),
-                            'burst':         layer_scores.get('burst', np.nan),
-                            'otip':          layer_scores.get('otip',  np.nan),
-                            'bip':           layer_scores.get('bip',   np.nan),
-                            'Profile':       get_profile(s,b,o,p2),
+                            'speed':         s,
+                            'burst':         b,
+                            'otip':          o,
+                            'bip':           p2,
+                            'Profile':       get_profile(s0,b0,o0,p0),
                             '_pos':          pos_p,
                             '_season':       player.get('season','—'),
                             '_total_minutes':int(player.get('total_minutes',0) or 0),
@@ -1137,11 +1143,13 @@ with tab5:
             display.columns = ['Player','Team','Position','Season','Age','Minutes',
                                '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
 
-            # Round numeric columns for display
+            # Format numeric columns
             for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
-                display[col] = display[col].round(0)
+                display[col] = display[col].apply(
+                    lambda x: int(round(x)) if pd.notna(x) else None)
             if 'Age' in display.columns:
-                display['Age'] = display['Age'].round(1)
+                display['Age'] = display['Age'].apply(
+                    lambda x: round(x,1) if pd.notna(x) else None)
 
             def bold_high(v):
                 try:
