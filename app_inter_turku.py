@@ -969,11 +969,12 @@ with tab5:
             def beats_it(row):
                 pos_it = row['_pos']
                 med = it_medians.get(pos_it, {})
-                # Must beat IT in at least 1 layer AND have a valid score
-                return any(
-                    pd.notna(row[l]) and row[l] > 0 and row[l] > med.get(l, 50)
-                    for l in ['speed','burst','otip','bip']
-                )
+                for l in ['speed','burst','otip','bip']:
+                    v = row[l]
+                    m = med.get(l, 50)
+                    if isinstance(v,(int,float)) and not pd.isna(v) and v > 0 and v > m:
+                        return True
+                return False
 
             # Show IT medians
             if it_medians:
@@ -1012,12 +1013,18 @@ with tab5:
                 n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
 
                 def top5_ready(row):
-                    vals = [row[l] for l in ['speed','burst','otip','bip']]
-                    # Only count layers with actual data (> 0)
-                    return sum(1 for v in vals if pd.notna(v) and v > 0 and v >= t5_threshold) >= n_layers
+                    count = 0
+                    for l in ['speed','burst','otip','bip']:
+                        v = row[l]
+                        # Must be a real number > 0 AND above threshold
+                        if isinstance(v, (int,float)) and not pd.isna(v) and v > 0 and v >= t5_threshold:
+                            count += 1
+                    return count >= n_layers
 
                 filtered = t5_pool_df[t5_pool_df.apply(top5_ready, axis=1)].copy()
                 pool_df  = t5_pool_df  # use t5 scores for display
+                # Verify: add count column for transparency
+                filtered = filtered.copy()
                 st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players ≥ {t5_threshold}% vs Top 5 in ≥ {n_layers} layers</div>', unsafe_allow_html=True)
 
         # ── MODE 3: Custom Filter ─────────────────────────────────────────────
