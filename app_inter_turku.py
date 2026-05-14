@@ -1039,7 +1039,7 @@ with tab5:
                 st.error("⚠️ top5.csv not loaded — file not found")
                 filtered = pd.DataFrame()
             else:
-                st.info(f"✅ Top 5 data loaded: {len(t5)} players, positions: {t5['position'].value_counts().to_dict()}")
+
                 t5_threshold = st.slider("Min. percentile vs Top 5 (in ≥ N layers)", 30, 80, 50, 5)
                 n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
 
@@ -1099,13 +1099,7 @@ with tab5:
 
                 filtered = pd.DataFrame(t5_rows)
                 pool_df  = filtered
-                # Debug
-                if not filtered.empty:
-                    samuel_debug = filtered[filtered['Player'].str.contains('Samuel', na=False)]
-                    st.write(f"DEBUG: {len(filtered)} rows, Samuel in filtered: {len(samuel_debug)>0}")
-                    if len(samuel_debug) > 0:
-                        st.write("Samuel scores:", samuel_debug.iloc[0][['Player','speed','burst','otip','bip']].to_dict())
-                    st.write("All players & scores:", filtered[['Player','speed','burst','otip','bip']].to_dict('records'))
+
                 st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players ≥ {t5_threshold}% vs Top 5 in ≥ {n_layers} layers</div>', unsafe_allow_html=True)
 
         # ── MODE 3: Custom Filter ─────────────────────────────────────────────
@@ -1145,12 +1139,11 @@ with tab5:
                                '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
 
             def color_val(v):
-                if pd.isna(v): return f'color:{MUTED}'
+                if pd.isna(v): return 'color:#555'
                 if v >= 85:    return f'color:#F0A500;font-weight:700'
                 if v >= 65:    return f'color:{BLUE};font-weight:600'
                 if v >= 45:    return f'color:{WHITE}'
-                if v >= 25:    return 'color:#888'
-                return f'color:{MUTED}'
+                return 'color:#AAA'
 
             styled = display.style
             for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
@@ -1161,6 +1154,9 @@ with tab5:
                  'Age':'{:.1f}'},
                 na_rep='—')
 
+            # Debug display
+            st.write("Display columns:", display.columns.tolist())
+            st.write("Display Burst values:", display['🚀 Burst'].tolist()[:5])
             event_of = st.dataframe(styled, width='stretch', height=480,
                                     on_select="rerun", selection_mode="single-row")
 
