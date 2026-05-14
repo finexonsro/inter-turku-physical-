@@ -494,7 +494,17 @@ with tab1:
         if 'Age' in result_df.columns:
             result_df['Age'] = result_df['Age'].round(1)
 
-        event = st.dataframe(result_df, width='stretch', height=520,
+        def bold_high(v):
+            try:
+                f = float(v)
+                if f >= 85: return 'font-weight:700;color:#F0A500'
+                if f >= 65: return 'font-weight:700'
+                return ''
+            except: return ''
+
+        score_cols = [c for c in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP'] if c in result_df.columns]
+        styled_sq = result_df.style.map(bold_high, subset=score_cols)
+        event = st.dataframe(styled_sq, width='stretch', height=520,
                              on_select="rerun", selection_mode="single-row")
 
         if event and event.selection and event.selection.rows:
@@ -1133,7 +1143,17 @@ with tab5:
             if 'Age' in display.columns:
                 display['Age'] = display['Age'].round(1)
 
-            event_of = st.dataframe(display, width='stretch', height=480,
+            def bold_high(v):
+                try:
+                    f = float(v)
+                    if f >= 85: return 'font-weight:700;color:#F0A500'
+                    if f >= 65: return 'font-weight:700'
+                    return ''
+                except: return ''
+
+            styled_of = display.style.map(bold_high,
+                subset=['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP'])
+            event_of = st.dataframe(styled_of, width='stretch', height=480,
                                     on_select="rerun", selection_mode="single-row")
 
             if event_of and event_of.selection and event_of.selection.rows:
