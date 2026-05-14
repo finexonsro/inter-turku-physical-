@@ -285,8 +285,7 @@ def load_data():
     t5 = parse_csv("top5.csv") if os.path.exists("top5.csv") else None
     return vk, t5
 
-def _compute_scores(bench_df_local):
-    """Compute layer scores for all VK players vs given benchmark."""
+def _build_rows(bench_df_local):
     rows = []
     for _, player in vk.iterrows():
         pos = player.get('position')
@@ -311,20 +310,20 @@ def _compute_scores(bench_df_local):
         })
     return pd.DataFrame(rows)
 
+# Separate cached functions with distinct signatures to avoid cache collision
 @st.cache_data
-def calc_all_scores_vk(vk_hash):
-    """Cached: VK players vs VK benchmark."""
-    return _compute_scores(vk)
+def calc_scores_vs_vk(vk_len):
+    return _build_rows(vk)
 
 @st.cache_data
-def calc_all_scores_t5(vk_hash, t5_hash):
-    """Cached: VK players vs Top 5 benchmark."""
-    return _compute_scores(t5 if t5 is not None else vk)
+def calc_scores_vs_t5(vk_len, t5_len):
+    return _build_rows(t5 if t5 is not None else vk)
 
 def calc_all_scores(vk_hash, bench_source, t5_hash="none"):
+    t5_len = len(t5) if t5 is not None else 0
     if bench_source == "t5":
-        return calc_all_scores_t5(vk_hash, t5_hash)
-    return calc_all_scores_vk(vk_hash)
+        return calc_scores_vs_t5(len(vk), t5_len)
+    return calc_scores_vs_vk(len(vk))
 
 vk, t5 = load_data()
 
