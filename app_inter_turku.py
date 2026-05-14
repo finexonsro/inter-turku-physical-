@@ -316,7 +316,7 @@ vk, t5 = load_data()
 
 def get_scores_df(bench_source):
     """Get cached scores — uses session_state keyed by bench_source."""
-    key = f"scores_{bench_source}"
+    key = f"scores_v2_{bench_source}"
     if key not in st.session_state:
         if bench_source == "t5" and t5 is not None:
             st.session_state[key] = build_scores_df(t5, vk)
@@ -493,8 +493,7 @@ with tab1:
                 result_df[col] = result_df[col].apply(
                     lambda x: int(round(x)) if pd.notna(x) else None)
         if 'Age' in result_df.columns:
-            result_df['Age'] = result_df['Age'].apply(
-                lambda x: round(x,1) if pd.notna(x) else None)
+            result_df['Age'] = pd.to_numeric(result_df['Age'], errors='coerce').round(1)
 
         def bold_high(v):
             try:
@@ -1148,8 +1147,7 @@ with tab5:
                 display[col] = display[col].apply(
                     lambda x: int(round(x)) if pd.notna(x) else None)
             if 'Age' in display.columns:
-                display['Age'] = display['Age'].apply(
-                    lambda x: round(x,1) if pd.notna(x) else None)
+                display['Age'] = pd.to_numeric(display['Age'], errors='coerce').round(1)
 
             def bold_high(v):
                 try:
