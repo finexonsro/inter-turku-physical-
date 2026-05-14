@@ -285,10 +285,11 @@ def load_data():
     t5 = parse_csv("top5.csv") if os.path.exists("top5.csv") else None
     return vk, t5
 
-def build_scores_df(bench_df_local):
+def build_scores_df(bench_df_local, source_df=None):
     """Build scores DataFrame for all VK players vs given benchmark."""
+    df_to_use = source_df if source_df is not None else vk
     rows = []
-    for _, player in vk.iterrows():
+    for _, player in df_to_use.iterrows():
         pos = player.get('position')
         if not pos: continue
         sc, _, prof = player_card(player, bench_df_local)
@@ -318,16 +319,9 @@ def get_scores_df(bench_source):
     key = f"scores_{bench_source}"
     if key not in st.session_state:
         if bench_source == "t5" and t5 is not None:
-            # Ensure t5 numeric columns converted
-            t5_num = t5.copy()
-            for col in t5_num.columns:
-                if col not in ['Player','Short Name','Team','Competition','Season',
-                               'Position Group','Birthdate','Player ID','Team ID',
-                               'Competition ID','Season ID','position','season','total_minutes','age']:
-                    t5_num[col] = pd.to_numeric(t5_num[col], errors='coerce')
-            st.session_state[key] = build_scores_df(t5_num)
+            st.session_state[key] = build_scores_df(t5, vk)
         else:
-            st.session_state[key] = build_scores_df(vk)
+            st.session_state[key] = build_scores_df(vk, vk)
     return st.session_state[key]
 
 def calc_all_scores(vk_hash, bench_source, t5_hash="none"):
@@ -1051,13 +1045,7 @@ with tab5:
                 # Calculate directly against t5 benchmark — no caching
                 with st.spinner("Calculating vs Top 5..."):
                     t5_rows = []
-                    # Ensure numeric conversion for t5
-                    bench_t5 = t5.copy()
-                    for col in bench_t5.columns:
-                        if col not in ['Player','Short Name','Team','Competition','Season',
-                                       'Position Group','Birthdate','Player ID','Team ID',
-                                       'Competition ID','Season ID','position','season']:
-                            bench_t5[col] = pd.to_numeric(bench_t5[col], errors='coerce')
+                    bench_t5 = t5  # already parsed with numeric conversion in load_data
                     for _, player in vk.iterrows():
                         pos_p = player.get('position')
                         if not pos_p: continue
