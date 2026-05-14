@@ -745,18 +745,28 @@ with tab4:
                 b = scores_a.get('burst',0) or 0
                 o = scores_a.get('otip', 0) or 0
                 p = scores_a.get('bip',  0) or 0
+                mins_a = int(a_row.get('total_minutes',0) or 0)
 
+                # Header — same as Player Profile
                 st.markdown(f"""
-                <div style="background:{CARD};border-left:4px solid {BLUE};
-                            border-radius:4px;padding:12px 16px;margin:12px 0;">
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;
-                        font-weight:800;">{a_row.get('Player','—')}</div>
-                    <div style="font-size:11px;color:{MUTED};">{a_row.get('Team','—')} ·
-                    {a_row.get('Competition','—')} · {POS_EN.get(pos,pos or '—')}</div>
-                    <div style="margin-top:8px;"><span class="profile-badge">{prof_a}</span></div>
+                <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
+                            border-radius:4px;padding:14px 18px;margin-bottom:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;
+                                font-weight:800;color:{WHITE};">{a_row.get('Player','—')}</div>
+                            <div style="font-size:11px;color:{MUTED};margin-top:3px;">
+                                {a_row.get('Team','—')} · {a_row.get('Competition','—')} ·
+                                {POS_EN.get(pos,pos or '—')} · {a_row.get('season','—')} ·
+                                {mins_a} min total
+                            </div>
+                        </div>
+                        <div class="profile-badge">{prof_a}</div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
 
+                # 4 Layer Cards
                 ac1,ac2,ac3,ac4 = st.columns(4)
                 for col,layer,score in zip([ac1,ac2,ac3,ac4],
                         ['speed','burst','otip','bip'],[s,b,o,p]):
@@ -766,12 +776,63 @@ with tab4:
                         st.markdown(f"""
                         <div class="layer-card" style="border-top:3px solid {color};">
                             <div class="layer-lbl">{LAYER_LABELS[layer]}</div>
-                            <div class="layer-score" style="color:{color};">{score:.0f}%</div>
+                            <div class="layer-score" style="color:{color};">
+                                {score:.0f}<span style="font-size:16px;color:{MUTED};">%</span>
+                            </div>
+                            <div style="font-size:9px;color:{MUTED};margin-top:2px;">vs {sel_bench}</div>
                             <div class="layer-level" style="color:{clr};">{lbl}</div>
                         </div>
                         """, unsafe_allow_html=True)
 
-                # Radar for ad-hoc
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # Layer breakdown — same layout as Player Profile
+                bc1, bc2 = st.columns([1,1])
+                with bc1:
+                    for layer in ['speed','burst']:
+                        color = LAYER_COLORS[layer]
+                        data  = all_data_a.get(layer,[])
+                        sc    = scores_a.get(layer,0) or 0
+                        bars  = ''.join(render_bar(n,v,p,u,color) for _,n,u,v,p,_ in data)
+                        st.markdown(f"""
+                        <div class="layer-card" style="border-top:2px solid {color};margin-bottom:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div>
+                                    <span style="font-size:10px;color:{color};font-weight:700;letter-spacing:0.1em;">
+                                        {LAYER_LABELS[layer]}</span>
+                                    <span style="font-size:9px;color:{MUTED};margin-left:6px;">
+                                        {LAYER_DESC[layer]}</span>
+                                </div>
+                                <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;
+                                    font-weight:800;color:{color};">{sc:.0f}%</div>
+                            </div>
+                            {bars}
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                with bc2:
+                    for layer in ['otip','bip']:
+                        color = LAYER_COLORS[layer]
+                        data  = all_data_a.get(layer,[])
+                        sc    = scores_a.get(layer,0) or 0
+                        bars  = ''.join(render_bar(n,v,p,u,color) for _,n,u,v,p,_ in data)
+                        st.markdown(f"""
+                        <div class="layer-card" style="border-top:2px solid {color};margin-bottom:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div>
+                                    <span style="font-size:10px;color:{color};font-weight:700;letter-spacing:0.1em;">
+                                        {LAYER_LABELS[layer]}</span>
+                                    <span style="font-size:9px;color:{MUTED};margin-left:6px;">
+                                        {LAYER_DESC[layer]}</span>
+                                </div>
+                                <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;
+                                    font-weight:800;color:{color};">{sc:.0f}%</div>
+                            </div>
+                            {bars}
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                # Radar
                 if any(x > 0 for x in [s,b,o,p]):
                     vals = [s,b,o,p,s]
                     lbls = ['Speed','Burst','OTIP','BIP','Speed']
@@ -796,11 +857,14 @@ with tab4:
                                 gridcolor='#2A2A2A')),
                         paper_bgcolor=BLACK,font=dict(color=WHITE,family='Barlow'),
                         showlegend=True,
-                        legend=dict(bgcolor=CARD,bordercolor='#2A2A2A',borderwidth=1,
-                            font=dict(size=10),orientation='h',y=-0.15,x=0.5,xanchor='center'),
-                        margin=dict(l=50,r=50,t=30,b=60),height=360)
+                        legend=dict(bgcolor='rgba(26,26,26,0.95)',bordercolor=RED,borderwidth=1,
+                            font=dict(size=12,color=WHITE),orientation='h',
+                            y=-0.18,x=0.5,xanchor='center'),
+                        margin=dict(l=50,r=50,t=30,b=70),height=380)
                     st.plotly_chart(fig_a, use_container_width=True)
+
                 # Export button
+                st.markdown('<div class="div" style="margin:16px 0 8px;"></div>', unsafe_allow_html=True)
                 if st.button("📄 Export Report (HTML)", key="adhoc_export"):
                     html = make_player_report(a_row, bench_df, sel_bench, scores_a, all_data_a, prof_a)
                     st.download_button(
