@@ -488,24 +488,13 @@ with tab1:
                      if c in result_df.columns]
         result_df = result_df[show_cols]
 
-        def color_val(v):
-            if pd.isna(v): return f'color:{MUTED}'
-            if v >= 85:    return f'color:#F0A500;font-weight:700'
-            if v >= 65:    return f'color:{BLUE};font-weight:600'
-            if v >= 45:    return f'color:{WHITE}'
-            if v >= 25:    return 'color:#888'
-            return f'color:{MUTED}'
-
-        styled = result_df.style
         for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
             if col in result_df.columns:
-                styled = styled.map(color_val, subset=[col])
-        styled = styled.format(
-            {'⚡ Speed':'{:.0f}','🚀 Burst':'{:.0f}',
-             '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}'},
-            na_rep='—')
+                result_df[col] = result_df[col].round(0)
+        if 'Age' in result_df.columns:
+            result_df['Age'] = result_df['Age'].round(1)
 
-        event = st.dataframe(styled, width='stretch', height=520,
+        event = st.dataframe(result_df, width='stretch', height=520,
                              on_select="rerun", selection_mode="single-row")
 
         if event and event.selection and event.selection.rows:
@@ -1138,26 +1127,13 @@ with tab5:
             display.columns = ['Player','Team','Position','Season','Age','Minutes',
                                '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
 
-            def color_val(v):
-                if pd.isna(v): return 'color:#555'
-                if v >= 85:    return f'color:#F0A500;font-weight:700'
-                if v >= 65:    return f'color:{BLUE};font-weight:600'
-                if v >= 45:    return f'color:{WHITE}'
-                return 'color:#AAA'
-
-            styled = display.style
+            # Round numeric columns for display
             for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
-                styled = styled.map(color_val, subset=[col])
-            styled = styled.format(
-                {'⚡ Speed':'{:.0f}','🚀 Burst':'{:.0f}',
-                 '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}',
-                 'Age':'{:.1f}'},
-                na_rep='—')
+                display[col] = display[col].round(0)
+            if 'Age' in display.columns:
+                display['Age'] = display['Age'].round(1)
 
-            # Debug display
-            st.write("Display columns:", display.columns.tolist())
-            st.write("Display Burst values:", display['🚀 Burst'].tolist()[:5])
-            event_of = st.dataframe(styled, width='stretch', height=480,
+            event_of = st.dataframe(display, width='stretch', height=480,
                                     on_select="rerun", selection_mode="single-row")
 
             if event_of and event_of.selection and event_of.selection.rows:
