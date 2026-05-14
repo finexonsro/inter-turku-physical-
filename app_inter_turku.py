@@ -403,11 +403,12 @@ with hc2:
 st.markdown('<div class="div" style="margin:8px 0 16px;"></div>', unsafe_allow_html=True)
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "🏟️ Squad Overview",
     "👤 Player Profile",
     "⚖️ Compare",
     "📤 Ad-hoc",
+    "🔍 Outlier Finder",
     "📖 Legend",
 ])
 
@@ -877,8 +878,219 @@ with tab4:
         except Exception as e:
             st.error(f"Error: {e}")
 
-# ── TAB 5: LEGEND ─────────────────────────────────────────────────────────────
+# ── TAB 5: OUTLIER FINDER ────────────────────────────────────────────────────
 with tab5:
+    st.markdown(f'<div class="sec">Outlier Finder — Physical Screening</div>', unsafe_allow_html=True)
+
+    # Mode selector
+    mode = st.radio("Screening Mode", [
+        "🏟️ Better than Inter Turku",
+        "🌍 Top 5 Ready",
+        "🎛️ Custom Filter",
+    ], horizontal=True)
+
+    st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
+
+    # Position filter
+    of_pos = st.selectbox("Position", ["All"] + sorted([p for p in vk['position'].dropna().unique() if p]),
+        format_func=lambda x: POS_EN.get(x,x) if x != "All" else "All",
+        key="of_pos")
+
+    # Season filter
+    of_season = st.selectbox("Season", ["All"] + sorted(vk['season'].dropna().unique().tolist(), reverse=True),
+        key="of_season")
+
+    of_min_min = st.slider("Min. Total Minutes", 0, 3000, 500, 100, key="of_min")
+
+    st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
+
+    # Build filtered pool
+    pool = vk.copy()
+    if of_season != "All":
+        pool = pool[pool['season'] == of_season]
+    if of_pos != "All":
+        pool = pool[pool['position'] == of_pos]
+    pool = pool[pool['total_minutes'].fillna(0) >= of_min_min]
+
+    # Calculate scores for all pool players
+    @st.cache_data
+    def calc_pool_scores(pool_hash, bench_hash):
+        pass  # placeholder for caching key
+
+    pool_rows = []
+    for _, player in pool.iterrows():
+        pos = player.get('position')
+        if not pos: continue
+        sc, _, prof = player_card(player, bench_df)
+        pool_rows.append({
+            'Player':   player.get('Player','—'),
+            'Team':     player.get('Team','—'),
+            'Position': POS_EN.get(pos,pos),
+            'Season':   player.get('season','—'),
+            'Minutes':  int(player.get('total_minutes',0) or 0),
+            'speed':    sc.get('speed',np.nan),
+            'burst':    sc.get('burst',np.nan),
+            'otip':     sc.get('otip', np.nan),
+            'bip':      sc.get('bip',  np.nan),
+            'Profile':  prof,
+            '_pos':     pos,
+        })
+
+    pool_df = pd.DataFrame(pool_rows)
+
+    if pool_df.empty:
+        st.info("No players match these filters.")
+    else:
+        # ── MODE 1: Better than Inter Turku ───────────────────────────────────
+        if mode == "🏟️ Better than Inter Turku":
+            st.markdown(f'<div style="font-size:11px;color:{MUTED};margin-bottom:12px;">Shows players who exceed FC Inter Turku median in at least one physical layer, per position.</div>', unsafe_allow_html=True)
+
+            # Calculate IT median per position per layer
+            it_df = vk[(vk['Team']=='FC Inter Turku')]
+            if of_season != "All":
+                it_df = it_df[it_df['season']==of_season]
+
+            it_medians = {}
+            for pos_it in pool_df['_pos'].unique():
+                it_pos = it_df[it_df['position']==pos_it]
+                if it_pos.empty: continue
+                pos_medians = {}
+                for layer, cols in get_layer_metrics().items():
+                    pcts = []
+                    for _, itp in it_pos.iterrows():
+                        bench_pos = bench_df[bench_df['position']==pos_it]
+                        for col,_,_,higher_better in cols:
+                            if col not in bench_pos.columns: continue
+                            bv = bench_pos[col].dropna()
+                            val = pd.to_numeric(itp.get(col,np.nan), errors='coerce')
+                            if pd.isna(val) or len(bv)<3: continue
+                            pct = float((bv<val).sum())/len(bv)*100 if higher_better                                   else float((bv>val).sum())/len(bv)*100
+                            pcts.append(pct)
+                    pos_medians[layer] = round(np.mean(pcts),1) if pcts else 50.0
+                it_medians[pos_it] = pos_medians
+
+            # Filter: better than IT in at least 1 layer
+            def beats_it(row):
+                pos_it = row['_pos']
+                med = it_medians.get(pos_it, {})
+                return any(
+                    pd.notna(row[l]) and row[l] > med.get(l, 50)
+                    for l in ['speed','burst','otip','bip']
+                )
+
+            # Show IT medians
+            if it_medians:
+                st.markdown(f'<div style="font-size:11px;color:{MUTED};margin-bottom:6px;font-weight:600;">FC Inter Turku Layer Medians ({of_season}):</div>', unsafe_allow_html=True)
+                med_cols = st.columns(len(it_medians))
+                for i, (pos_it, meds) in enumerate(it_medians.items()):
+                    with med_cols[i]:
+                        st.markdown(f'<div style="font-size:10px;color:{BLUE};font-weight:700;margin-bottom:4px;">{POS_EN.get(pos_it,pos_it)}</div>', unsafe_allow_html=True)
+                        for l,lbl in [('speed','⚡'),('burst','🚀'),('otip','🏃'),('bip','💥')]:
+                            val = meds.get(l,0)
+                            clr,_ = (WHITE, None) if val >= 50 else (MUTED, None)
+                            st.markdown(f'<div style="font-size:10px;">{lbl} {val:.0f}%</div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
+
+            filtered = pool_df[pool_df.apply(beats_it, axis=1)]
+            st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players exceed IT median in at least 1 layer</div>', unsafe_allow_html=True)
+
+        # ── MODE 2: Top 5 Ready ───────────────────────────────────────────────
+        elif mode == "🌍 Top 5 Ready":
+            st.markdown(f'<div style="font-size:11px;color:{MUTED};margin-bottom:12px;">Players benchmarked against Top 5 leagues — shows who could compete at the highest level physically.</div>', unsafe_allow_html=True)
+
+            if t5 is None:
+                st.warning("Top 5 data not loaded. Add top5.csv to enable this mode.")
+                filtered = pd.DataFrame()
+            else:
+                # Recalculate scores vs Top 5 benchmark
+                t5_rows = []
+                for _, player in pool.iterrows():
+                    pos = player.get('position')
+                    if not pos: continue
+                    sc, _, prof = player_card(player, t5)
+                    t5_rows.append({
+                        'Player':   player.get('Player','—'),
+                        'Team':     player.get('Team','—'),
+                        'Position': POS_EN.get(pos,pos),
+                        'Season':   player.get('season','—'),
+                        'Minutes':  int(player.get('total_minutes',0) or 0),
+                        'speed':    sc.get('speed',np.nan),
+                        'burst':    sc.get('burst',np.nan),
+                        'otip':     sc.get('otip', np.nan),
+                        'bip':      sc.get('bip',  np.nan),
+                        'Profile':  prof,
+                        '_pos':     pos,
+                    })
+                t5_pool_df = pd.DataFrame(t5_rows)
+
+                t5_threshold = st.slider("Min. percentile vs Top 5 (in ≥ N layers)", 30, 80, 50, 5)
+                n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
+
+                def top5_ready(row):
+                    vals = [row[l] for l in ['speed','burst','otip','bip']]
+                    return sum(1 for v in vals if pd.notna(v) and v >= t5_threshold) >= n_layers
+
+                filtered = t5_pool_df[t5_pool_df.apply(top5_ready, axis=1)].copy()
+                pool_df  = t5_pool_df  # use t5 scores for display
+                st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players ≥ {t5_threshold}% vs Top 5 in ≥ {n_layers} layers</div>', unsafe_allow_html=True)
+
+        # ── MODE 3: Custom Filter ─────────────────────────────────────────────
+        else:
+            st.markdown(f'<div style="font-size:11px;color:{MUTED};margin-bottom:12px;">Set minimum thresholds per layer to find specific physical profiles.</div>', unsafe_allow_html=True)
+
+            cf1, cf2, cf3, cf4 = st.columns(4)
+            with cf1:
+                min_speed = st.slider("⚡ Speed min %", 0, 95, 0, 5, key="cf_speed")
+            with cf2:
+                min_burst = st.slider("🚀 Burst min %", 0, 95, 0, 5, key="cf_burst")
+            with cf3:
+                min_otip  = st.slider("🏃 OTIP min %",  0, 95, 0, 5, key="cf_otip")
+            with cf4:
+                min_bip   = st.slider("💥 BIP min %",   0, 95, 0, 5, key="cf_bip")
+
+            filtered = pool_df[
+                (pool_df['speed'].fillna(0) >= min_speed) &
+                (pool_df['burst'].fillna(0) >= min_burst) &
+                (pool_df['otip'].fillna(0)  >= min_otip)  &
+                (pool_df['bip'].fillna(0)   >= min_bip)
+            ]
+            st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players match this profile</div>', unsafe_allow_html=True)
+
+        # ── RESULTS TABLE ─────────────────────────────────────────────────────
+        if not filtered.empty:
+            display = filtered[['Player','Team','Position','Season','Minutes',
+                                'speed','burst','otip','bip','Profile']].copy()
+            display.columns = ['Player','Team','Position','Season','Minutes',
+                               '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
+
+            def color_val(v):
+                if pd.isna(v): return f'color:{MUTED}'
+                if v >= 85:    return f'color:#F0A500;font-weight:700'
+                if v >= 65:    return f'color:{BLUE};font-weight:600'
+                if v >= 45:    return f'color:{WHITE}'
+                if v >= 25:    return 'color:#888'
+                return f'color:{MUTED}'
+
+            styled = display.style
+            for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
+                styled = styled.map(color_val, subset=[col])
+            styled = styled.format(
+                {'⚡ Speed':'{:.0f}','🚀 Burst':'{:.0f}',
+                 '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}'},
+                na_rep='—')
+
+            event_of = st.dataframe(styled, use_container_width=True, height=480,
+                                    on_select="rerun", selection_mode="single-row")
+
+            if event_of and event_of.selection and event_of.selection.rows:
+                idx = event_of.selection.rows[0]
+                if idx < len(filtered):
+                    st.session_state['sel_player'] = filtered.iloc[idx]['Player']
+                    st.success(f"→ Go to Player Profile tab to see full profile of {filtered.iloc[idx]['Player']}")
+
+# ── TAB 6: LEGEND ─────────────────────────────────────────────────────────────
+with tab6:
     lc1, lc2 = st.columns(2)
     with lc1:
         st.markdown('<div class="sec">The Four Physical Layers</div>', unsafe_allow_html=True)
