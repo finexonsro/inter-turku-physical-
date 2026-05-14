@@ -273,6 +273,11 @@ def load_data():
             df['Minutes'].fillna(0) *
             df['Count Performances (Physical Check passed)'].fillna(0)
         ).round(0).astype(int)
+        if 'Birthdate' in df.columns:
+            df['birthdate'] = pd.to_datetime(df['Birthdate'], errors='coerce')
+            df['age'] = ((pd.Timestamp('today') - df['birthdate']).dt.days / 365.25).round(1)
+        else:
+            df['age'] = np.nan
         return df
 
     vk = parse_csv("veikkausliiga.csv")
@@ -280,7 +285,7 @@ def load_data():
     return vk, t5
 
 @st.cache_data
-def calc_all_scores(vk_hash, bench_source):
+def calc_all_scores(vk_hash, bench_source, t5_hash=""):
     """Pre-calculate layer scores for all players vs a benchmark."""
     bench = vk if bench_source == "vk" else (t5 if t5 is not None else vk)
     rows = []
@@ -293,6 +298,7 @@ def calc_all_scores(vk_hash, bench_source):
             'Team':          player.get('Team','—'),
             'Position':      POS_EN.get(pos,pos),
             'Season':        player.get('season','—'),
+            'Age':           player.get('age', np.nan),
             'Minutes':       int(player.get('total_minutes',0) or 0),
             'speed':         sc.get('speed',np.nan),
             'burst':         sc.get('burst',np.nan),
@@ -302,6 +308,7 @@ def calc_all_scores(vk_hash, bench_source):
             '_pos':          pos,
             '_season':       player.get('season','—'),
             '_total_minutes':int(player.get('total_minutes',0) or 0),
+            '_age':          player.get('age', np.nan),
         })
     return pd.DataFrame(rows)
 
@@ -443,7 +450,8 @@ with tab1:
     else:
         # Use pre-calculated scores
         bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
-        all_scores_df = calc_all_scores(str(len(vk)), bench_source)
+        t5_hash = str(len(t5)) if t5 is not None else "0"
+        all_scores_df = calc_all_scores(str(len(vk)), bench_source, t5_hash)
 
         # Apply sidebar filters
         result_df = all_scores_df.copy()
@@ -458,6 +466,7 @@ with tab1:
         result_df = result_df.rename(columns={
             'speed': '⚡ Speed', 'burst': '🚀 Burst',
             'otip':  '🏃 OTIP',  'bip':   '💥 BIP',
+            'Age':   'Age',
         })
 
         def color_val(v):
@@ -920,12 +929,16 @@ with tab5:
         key="of_season")
 
     of_min_min = st.slider("Min. Total Minutes", 0, 3000, 200, 100, key="of_min")
+    age_col1, age_col2 = st.columns(2)
+    with age_col1:
+        of_max_age = st.slider("Max. Age", 15, 40, 28, 1, key="of_age")
 
     st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
 
     # Use pre-calculated scores
     bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
-    pool_df = calc_all_scores(str(len(vk)), bench_source)
+    t5_hash = str(len(t5)) if t5 is not None else "0"
+    pool_df = calc_all_scores(str(len(vk)), bench_source, t5_hash)
 
     # Apply filters
     if of_season != "All":
@@ -933,6 +946,7 @@ with tab5:
     if of_pos != "All":
         pool_df = pool_df[pool_df['_pos'] == of_pos]
     pool_df = pool_df[pool_df['_total_minutes'] >= of_min_min]
+    pool_df = pool_df[pool_df['_age'].isna() | (pool_df['_age'] <= of_max_age)]
 
     if pool_df.empty:
         st.info("No players match these filters.")
@@ -1002,7 +1016,8 @@ with tab5:
                 filtered = pd.DataFrame()
             else:
                 # Use pre-calculated Top 5 scores
-                t5_pool_df = calc_all_scores(str(len(vk)), "t5")
+                t5_hash2 = str(len(t5)) if t5 is not None else "0"
+                t5_pool_df = calc_all_scores(str(len(vk)), "t5", t5_hash2)
                 if of_season != "All":
                     t5_pool_df = t5_pool_df[t5_pool_df['_season'] == of_season]
                 if of_pos != "All":
@@ -1054,9 +1069,9 @@ with tab5:
 
         # ── RESULTS TABLE ─────────────────────────────────────────────────────
         if not filtered.empty:
-            display = filtered[['Player','Team','Position','Season','Minutes',
+            display = filtered[['Player','Team','Position','Season','Age','Minutes',
                                 'speed','burst','otip','bip','Profile']].copy()
-            display.columns = ['Player','Team','Position','Season','Minutes',
+            display.columns = ['Player','Team','Position','Season','Age','Minutes',
                                '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
 
             def color_val(v):
