@@ -298,7 +298,7 @@ def build_scores_df(bench_df_local, source_df=None):
             'Team':          player.get('Team','—'),
             'Position':      POS_EN.get(pos,pos),
             'Season':        player.get('season','—'),
-            'Age':           player.get('age', np.nan),
+            'Age':           round(player.get('age', np.nan), 1) if pd.notna(player.get('age', np.nan)) else np.nan,
             'Minutes':       int(player.get('total_minutes',0) or 0),
             'speed':         sc.get('speed',np.nan),
             'burst':         sc.get('burst',np.nan),
