@@ -1034,31 +1034,61 @@ with tab5:
                 st.warning("Top 5 data not loaded. Add top5.csv to enable this mode.")
                 filtered = pd.DataFrame()
             else:
-                # Use pre-calculated Top 5 scores
-                t5_hash2 = str(len(t5)) if t5 is not None else "0"
-                t5_pool_df = calc_all_scores(str(len(vk)), "t5", t5_hash2)
-                if of_season != "All":
-                    t5_pool_df = t5_pool_df[t5_pool_df['_season'] == of_season]
-                if of_pos != "All":
-                    t5_pool_df = t5_pool_df[t5_pool_df['_pos'] == of_pos]
-                t5_pool_df = t5_pool_df[t5_pool_df['_total_minutes'] >= of_min_min]
-
                 t5_threshold = st.slider("Min. percentile vs Top 5 (in ≥ N layers)", 30, 80, 50, 5)
                 n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
 
-                def top5_ready(row):
-                    count = 0
-                    for l in ['speed','burst','otip','bip']:
-                        v = row[l]
-                        # Must be a real number > 0 AND above threshold
-                        if isinstance(v, (int,float)) and not pd.isna(v) and v > 0 and v >= t5_threshold:
-                            count += 1
-                    return count >= n_layers
+                # Calculate directly against t5 benchmark — no caching
+                with st.spinner("Calculating vs Top 5..."):
+                    t5_rows = []
+                    bench_t5 = t5  # explicit reference
+                    for _, player in vk.iterrows():
+                        pos_p = player.get('position')
+                        if not pos_p: continue
+                        # Apply filters early
+                        if of_pos != "All" and pos_p != of_pos: continue
+                        if of_season != "All" and player.get('season') != of_season: continue
+                        if int(player.get('total_minutes',0) or 0) < of_min_min: continue
+                        age_p = player.get('_age', player.get('age', np.nan))
+                        if pd.notna(age_p) and age_p > of_max_age: continue
 
-                filtered = t5_pool_df[t5_pool_df.apply(top5_ready, axis=1)].copy()
-                pool_df  = t5_pool_df  # use t5 scores for display
-                # Verify: add count column for transparency
-                filtered = filtered.copy()
+                        bench_pos = bench_t5[bench_t5['position'] == pos_p]
+                        layer_scores = {}
+                        for layer, cols in get_layer_metrics().items():
+                            pcts = []
+                            for col, name, unit, higher_better in cols:
+                                if col not in bench_pos.columns: continue
+                                bench_vals = pd.to_numeric(bench_pos[col], errors='coerce').dropna()
+                                val = pd.to_numeric(player.get(col, np.nan), errors='coerce')
+                                if pd.isna(val) or len(bench_vals) < 3: continue
+                                pct = float((bench_vals < val).sum())/len(bench_vals)*100 if higher_better                                       else float((bench_vals > val).sum())/len(bench_vals)*100
+                                pcts.append(pct)
+                            layer_scores[layer] = round(np.mean(pcts),1) if pcts else np.nan
+
+                        # Count layers above threshold
+                        n_above = sum(1 for l in ['speed','burst','otip','bip']
+                                     if pd.notna(layer_scores.get(l)) and
+                                     layer_scores.get(l,0) > 0 and
+                                     layer_scores.get(l,0) >= t5_threshold)
+                        if n_above < n_layers: continue
+
+                        s,b,o,p2 = (layer_scores.get(k,0) or 0 for k in ['speed','burst','otip','bip'])
+                        t5_rows.append({
+                            'Player':   player.get('Player','—'),
+                            'Team':     player.get('Team','—'),
+                            'Position': POS_EN.get(pos_p, pos_p),
+                            'Season':   player.get('season','—'),
+                            'Age':      round(player.get('age', np.nan), 1) if pd.notna(player.get('age', np.nan)) else np.nan,
+                            'Minutes':  int(player.get('total_minutes',0) or 0),
+                            'speed':    layer_scores.get('speed', np.nan),
+                            'burst':    layer_scores.get('burst', np.nan),
+                            'otip':     layer_scores.get('otip',  np.nan),
+                            'bip':      layer_scores.get('bip',   np.nan),
+                            'Profile':  get_profile(s,b,o,p2),
+                            '_pos':     pos_p,
+                        })
+
+                filtered = pd.DataFrame(t5_rows)
+                pool_df  = filtered
                 st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players ≥ {t5_threshold}% vs Top 5 in ≥ {n_layers} layers</div>', unsafe_allow_html=True)
 
         # ── MODE 3: Custom Filter ─────────────────────────────────────────────
