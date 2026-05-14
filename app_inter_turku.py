@@ -919,7 +919,7 @@ with tab5:
     of_season = st.selectbox("Season", ["All"] + sorted(vk['season'].dropna().unique().tolist(), reverse=True),
         key="of_season")
 
-    of_min_min = st.slider("Min. Total Minutes", 0, 3000, 500, 100, key="of_min")
+    of_min_min = st.slider("Min. Total Minutes", 0, 3000, 200, 100, key="of_min")
 
     st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
 
@@ -969,8 +969,9 @@ with tab5:
             def beats_it(row):
                 pos_it = row['_pos']
                 med = it_medians.get(pos_it, {})
+                # Must beat IT in at least 1 layer AND have a valid score
                 return any(
-                    pd.notna(row[l]) and row[l] > med.get(l, 50)
+                    pd.notna(row[l]) and row[l] > 0 and row[l] > med.get(l, 50)
                     for l in ['speed','burst','otip','bip']
                 )
 
@@ -1012,7 +1013,8 @@ with tab5:
 
                 def top5_ready(row):
                     vals = [row[l] for l in ['speed','burst','otip','bip']]
-                    return sum(1 for v in vals if pd.notna(v) and v >= t5_threshold) >= n_layers
+                    # Only count layers with actual data (> 0)
+                    return sum(1 for v in vals if pd.notna(v) and v > 0 and v >= t5_threshold) >= n_layers
 
                 filtered = t5_pool_df[t5_pool_df.apply(top5_ready, axis=1)].copy()
                 pool_df  = t5_pool_df  # use t5 scores for display
@@ -1032,12 +1034,15 @@ with tab5:
             with cf4:
                 min_bip   = st.slider("💥 BIP min %",   0, 95, 0, 5, key="cf_bip")
 
-            filtered = pool_df[
-                (pool_df['speed'].fillna(0) >= min_speed) &
-                (pool_df['burst'].fillna(0) >= min_burst) &
-                (pool_df['otip'].fillna(0)  >= min_otip)  &
-                (pool_df['bip'].fillna(0)   >= min_bip)
-            ]
+            def passes_custom(row):
+                checks = []
+                if min_speed > 0: checks.append(pd.notna(row['speed']) and row['speed'] >= min_speed)
+                if min_burst > 0: checks.append(pd.notna(row['burst']) and row['burst'] >= min_burst)
+                if min_otip  > 0: checks.append(pd.notna(row['otip'])  and row['otip']  >= min_otip)
+                if min_bip   > 0: checks.append(pd.notna(row['bip'])   and row['bip']   >= min_bip)
+                if not checks: return True  # no filters active = show all
+                return all(checks)
+            filtered = pool_df[pool_df.apply(passes_custom, axis=1)]
             st.markdown(f'<div style="font-size:11px;color:{BLUE};margin-bottom:8px;"><b>{len(filtered)}</b> players match this profile</div>', unsafe_allow_html=True)
 
         # ── RESULTS TABLE ─────────────────────────────────────────────────────
