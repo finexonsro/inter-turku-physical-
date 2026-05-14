@@ -261,15 +261,14 @@ body{{font-family:Arial,sans-serif;margin:0;padding:24px;background:#111;color:#
 def load_data():
     def parse_csv(path):
         df = pd.read_csv(path, sep=';', decimal=',', low_memory=False)
-        # Convert numeric columns
         for col in df.columns:
             if col not in ['Player','Short Name','Team','Competition','Season',
                            'Position Group','Birthdate','Player ID','Team ID',
                            'Competition ID','Season ID']:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+        df = df.copy()
         df['position'] = df['Position Group'].map(POS_MAP)
         df['season']   = df['Season'].str[:4]
-        # Total minutes = avg minutes per game × number of games
         df['total_minutes'] = (
             df['Minutes'].fillna(0) *
             df['Count Performances (Physical Check passed)'].fillna(0)
@@ -278,8 +277,33 @@ def load_data():
 
     vk = parse_csv("veikkausliiga.csv")
     t5 = parse_csv("top5.csv") if os.path.exists("top5.csv") else None
-    t5['position'] = t5['Position Group'].map(POS_MAP)
     return vk, t5
+
+@st.cache_data
+def calc_all_scores(vk_hash, bench_source):
+    """Pre-calculate layer scores for all players vs a benchmark."""
+    bench = vk if bench_source == "vk" else (t5 if t5 is not None else vk)
+    rows = []
+    for _, player in vk.iterrows():
+        pos = player.get('position')
+        if not pos: continue
+        sc, _, prof = player_card(player, bench)
+        rows.append({
+            'Player':        player.get('Player','—'),
+            'Team':          player.get('Team','—'),
+            'Position':      POS_EN.get(pos,pos),
+            'Season':        player.get('season','—'),
+            'Minutes':       int(player.get('total_minutes',0) or 0),
+            'speed':         sc.get('speed',np.nan),
+            'burst':         sc.get('burst',np.nan),
+            'otip':          sc.get('otip', np.nan),
+            'bip':           sc.get('bip',  np.nan),
+            'Profile':       prof,
+            '_pos':          pos,
+            '_season':       player.get('season','—'),
+            '_total_minutes':int(player.get('total_minutes',0) or 0),
+        })
+    return pd.DataFrame(rows)
 
 vk, t5 = load_data()
 
@@ -417,29 +441,24 @@ with tab1:
     if df_f.empty:
         st.info("No players match these filters.")
     else:
-        rows = []
-        for _, player in df_f.iterrows():
-            pos = player.get('position')
-            if not pos: continue
-            scores, _, profile = player_card(player, bench_df)
-            s = scores.get('speed',np.nan)
-            b = scores.get('burst',np.nan)
-            o = scores.get('otip', np.nan)
-            p = scores.get('bip',  np.nan)
-            rows.append({
-                'Player':    player.get('Player','—'),
-                'Team':      player.get('Team','—'),
-                'Position':  POS_EN.get(pos,pos),
-                'Season':    player.get('season','—'),
-                'Minutes':   int(player.get('total_minutes',0) or 0),
-                '⚡ Speed':  s,
-                '🚀 Burst':  b,
-                '🏃 OTIP':   o,
-                '💥 BIP':    p,
-                'Profile':   profile,
-            })
+        # Use pre-calculated scores
+        bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
+        all_scores_df = calc_all_scores(str(len(vk)), bench_source)
 
-        result_df = pd.DataFrame(rows)
+        # Apply sidebar filters
+        result_df = all_scores_df.copy()
+        if sel_season != "All":
+            result_df = result_df[result_df['_season'] == sel_season]
+        if sel_pos != "All":
+            result_df = result_df[result_df['_pos'] == sel_pos]
+        if sel_team != "All":
+            result_df = result_df[result_df['Team'] == sel_team]
+        result_df = result_df[result_df['_total_minutes'] >= min_minutes]
+
+        result_df = result_df.rename(columns={
+            'speed': '⚡ Speed', 'burst': '🚀 Burst',
+            'otip':  '🏃 OTIP',  'bip':   '💥 BIP',
+        })
 
         def color_val(v):
             if pd.isna(v): return f'color:{MUTED}'
@@ -458,7 +477,7 @@ with tab1:
              '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}'},
             na_rep='—')
 
-        event = st.dataframe(styled, use_container_width=True, height=520,
+        event = st.dataframe(styled, width='stretch', height=520,
                              on_select="rerun", selection_mode="single-row")
 
         if event and event.selection and event.selection.rows:
@@ -904,39 +923,16 @@ with tab5:
 
     st.markdown('<div class="div" style="margin:10px 0;"></div>', unsafe_allow_html=True)
 
-    # Build filtered pool
-    pool = vk.copy()
+    # Use pre-calculated scores
+    bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
+    pool_df = calc_all_scores(str(len(vk)), bench_source)
+
+    # Apply filters
     if of_season != "All":
-        pool = pool[pool['season'] == of_season]
+        pool_df = pool_df[pool_df['_season'] == of_season]
     if of_pos != "All":
-        pool = pool[pool['position'] == of_pos]
-    pool = pool[pool['total_minutes'].fillna(0) >= of_min_min]
-
-    # Calculate scores for all pool players
-    @st.cache_data
-    def calc_pool_scores(pool_hash, bench_hash):
-        pass  # placeholder for caching key
-
-    pool_rows = []
-    for _, player in pool.iterrows():
-        pos = player.get('position')
-        if not pos: continue
-        sc, _, prof = player_card(player, bench_df)
-        pool_rows.append({
-            'Player':   player.get('Player','—'),
-            'Team':     player.get('Team','—'),
-            'Position': POS_EN.get(pos,pos),
-            'Season':   player.get('season','—'),
-            'Minutes':  int(player.get('total_minutes',0) or 0),
-            'speed':    sc.get('speed',np.nan),
-            'burst':    sc.get('burst',np.nan),
-            'otip':     sc.get('otip', np.nan),
-            'bip':      sc.get('bip',  np.nan),
-            'Profile':  prof,
-            '_pos':     pos,
-        })
-
-    pool_df = pd.DataFrame(pool_rows)
+        pool_df = pool_df[pool_df['_pos'] == of_pos]
+    pool_df = pool_df[pool_df['_total_minutes'] >= of_min_min]
 
     if pool_df.empty:
         st.info("No players match these filters.")
@@ -1003,26 +999,13 @@ with tab5:
                 st.warning("Top 5 data not loaded. Add top5.csv to enable this mode.")
                 filtered = pd.DataFrame()
             else:
-                # Recalculate scores vs Top 5 benchmark
-                t5_rows = []
-                for _, player in pool.iterrows():
-                    pos = player.get('position')
-                    if not pos: continue
-                    sc, _, prof = player_card(player, t5)
-                    t5_rows.append({
-                        'Player':   player.get('Player','—'),
-                        'Team':     player.get('Team','—'),
-                        'Position': POS_EN.get(pos,pos),
-                        'Season':   player.get('season','—'),
-                        'Minutes':  int(player.get('total_minutes',0) or 0),
-                        'speed':    sc.get('speed',np.nan),
-                        'burst':    sc.get('burst',np.nan),
-                        'otip':     sc.get('otip', np.nan),
-                        'bip':      sc.get('bip',  np.nan),
-                        'Profile':  prof,
-                        '_pos':     pos,
-                    })
-                t5_pool_df = pd.DataFrame(t5_rows)
+                # Use pre-calculated Top 5 scores
+                t5_pool_df = calc_all_scores(str(len(vk)), "t5")
+                if of_season != "All":
+                    t5_pool_df = t5_pool_df[t5_pool_df['_season'] == of_season]
+                if of_pos != "All":
+                    t5_pool_df = t5_pool_df[t5_pool_df['_pos'] == of_pos]
+                t5_pool_df = t5_pool_df[t5_pool_df['_total_minutes'] >= of_min_min]
 
                 t5_threshold = st.slider("Min. percentile vs Top 5 (in ≥ N layers)", 30, 80, 50, 5)
                 n_layers     = st.slider("Min. number of layers above threshold", 1, 4, 2)
@@ -1080,7 +1063,7 @@ with tab5:
                  '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}'},
                 na_rep='—')
 
-            event_of = st.dataframe(styled, use_container_width=True, height=480,
+            event_of = st.dataframe(styled, width='stretch', height=480,
                                     on_select="rerun", selection_mode="single-row")
 
             if event_of and event_of.selection and event_of.selection.rows:
