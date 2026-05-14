@@ -275,7 +275,8 @@ def load_data():
         ).round(0).astype(int)
         if 'Birthdate' in df.columns:
             df['birthdate'] = pd.to_datetime(df['Birthdate'], errors='coerce')
-            df['age'] = ((pd.Timestamp('today') - df['birthdate']).dt.days / 365.25).round(1)
+            df['age'] = ((pd.Timestamp('today') - df['birthdate']).dt.days / 365.25).apply(
+                lambda x: round(x, 1) if pd.notna(x) else np.nan)
         else:
             df['age'] = np.nan
         return df
@@ -284,15 +285,13 @@ def load_data():
     t5 = parse_csv("top5.csv") if os.path.exists("top5.csv") else None
     return vk, t5
 
-@st.cache_data
-def calc_all_scores(vk_hash, bench_source, t5_hash=""):
-    """Pre-calculate layer scores for all players vs a benchmark."""
-    bench = vk if bench_source == "vk" else (t5 if t5 is not None else vk)
+def _compute_scores(bench_df_local):
+    """Compute layer scores for all VK players vs given benchmark."""
     rows = []
     for _, player in vk.iterrows():
         pos = player.get('position')
         if not pos: continue
-        sc, _, prof = player_card(player, bench)
+        sc, _, prof = player_card(player, bench_df_local)
         rows.append({
             'Player':        player.get('Player','—'),
             'Team':          player.get('Team','—'),
@@ -311,6 +310,21 @@ def calc_all_scores(vk_hash, bench_source, t5_hash=""):
             '_age':          player.get('age', np.nan),
         })
     return pd.DataFrame(rows)
+
+@st.cache_data
+def calc_all_scores_vk(vk_hash):
+    """Cached: VK players vs VK benchmark."""
+    return _compute_scores(vk)
+
+@st.cache_data
+def calc_all_scores_t5(vk_hash, t5_hash):
+    """Cached: VK players vs Top 5 benchmark."""
+    return _compute_scores(t5 if t5 is not None else vk)
+
+def calc_all_scores(vk_hash, bench_source, t5_hash="none"):
+    if bench_source == "t5":
+        return calc_all_scores_t5(vk_hash, t5_hash)
+    return calc_all_scores_vk(vk_hash)
 
 vk, t5 = load_data()
 
@@ -384,6 +398,7 @@ with st.sidebar:
     sel_team = st.selectbox("Team", ["All"] + teams)
 
     min_minutes = st.slider("Min. Total Minutes", 0, 5000, 300, 100)
+    max_age     = st.slider("Max. Age", 15, 40, 35, 1)
 
     st.markdown('<div class="div"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sec">Benchmark</div>', unsafe_allow_html=True)
@@ -411,6 +426,7 @@ if sel_pos != "All":
 if sel_team != "All":
     df_f = df_f[df_f['Team'] == sel_team]
 df_f = df_f[df_f['total_minutes'].fillna(0) >= min_minutes]
+df_f = df_f[df_f['age'].isna() | (df_f['age'] <= max_age)]
 
 # ── HEADER ────────────────────────────────────────────────────────────────────
 hc1, hc2 = st.columns([1,8])
@@ -522,7 +538,9 @@ with tab2:
     p = scores.get('bip',  0) or 0
 
     # Header
-    mins = int(player_row.get('total_minutes',0) or 0)
+    mins    = int(player_row.get('total_minutes',0) or 0)
+    age_val = player_row.get('age', np.nan)
+    age_str = f"{age_val:.1f} yrs" if pd.notna(age_val) else "—"
     st.markdown(f"""
     <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
                 border-radius:4px;padding:14px 18px;margin-bottom:16px;">
@@ -536,6 +554,7 @@ with tab2:
                     {player_row.get('Team','—')} &nbsp;·&nbsp;
                     {player_row.get('Competition','—')} &nbsp;·&nbsp;
                     {POS_EN.get(pos,pos or '—')} &nbsp;·&nbsp;
+                    {age_str} &nbsp;·&nbsp;
                     {player_row.get('season','—')} &nbsp;·&nbsp;
                     {mins} min total
                 </div>
@@ -777,6 +796,8 @@ with tab4:
                 mins_a = int(a_row.get('total_minutes',0) or 0)
 
                 # Header — same as Player Profile
+                age_a = a_row.get('age', np.nan)
+                age_str_a = f"{age_a:.1f} yrs" if pd.notna(age_a) else "—"
                 st.markdown(f"""
                 <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
                             border-radius:4px;padding:14px 18px;margin-bottom:16px;">
@@ -786,7 +807,7 @@ with tab4:
                                 font-weight:800;color:{WHITE};">{a_row.get('Player','—')}</div>
                             <div style="font-size:11px;color:{MUTED};margin-top:3px;">
                                 {a_row.get('Team','—')} · {a_row.get('Competition','—')} ·
-                                {POS_EN.get(pos,pos or '—')} · {a_row.get('season','—')} ·
+                                {POS_EN.get(pos,pos or '—')} · {age_str_a} · {a_row.get('season','—')} ·
                                 {mins_a} min total
                             </div>
                         </div>
@@ -1087,7 +1108,8 @@ with tab5:
                 styled = styled.map(color_val, subset=[col])
             styled = styled.format(
                 {'⚡ Speed':'{:.0f}','🚀 Burst':'{:.0f}',
-                 '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}'},
+                 '🏃 OTIP':'{:.0f}','💥 BIP':'{:.0f}',
+                 'Age':'{:.1f}'},
                 na_rep='—')
 
             event_of = st.dataframe(styled, width='stretch', height=480,
