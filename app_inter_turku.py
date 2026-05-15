@@ -493,7 +493,8 @@ with tab1:
                 result_df[col] = result_df[col].apply(
                     lambda x: int(round(x)) if pd.notna(x) else None)
         if 'Age' in result_df.columns:
-            result_df['Age'] = pd.to_numeric(result_df['Age'], errors='coerce').round(1)
+            result_df['Age'] = pd.to_numeric(result_df['Age'], errors='coerce').apply(
+                lambda x: f"{x:.1f}" if pd.notna(x) else "—")
 
         def bold_high(v):
             try:
@@ -1147,7 +1148,8 @@ with tab5:
                 display[col] = display[col].apply(
                     lambda x: int(round(x)) if pd.notna(x) else None)
             if 'Age' in display.columns:
-                display['Age'] = pd.to_numeric(display['Age'], errors='coerce').round(1)
+                display['Age'] = pd.to_numeric(display['Age'], errors='coerce').apply(
+                    lambda x: f"{x:.1f}" if pd.notna(x) else "—")
 
             def bold_high(v):
                 try:
