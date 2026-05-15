@@ -357,6 +357,7 @@ def build_scores_df(bench_df_local, source_df=None):
     return pd.DataFrame({
         'Player':        src['Player'].fillna('—'),
         'Team':          src['Team'].fillna('—'),
+        'Competition':   src['Competition'].fillna('—') if 'Competition' in src.columns else '—',
         'Position':      src['position'].map(lambda x: POS_EN.get(x,x) if x else '—'),
         'Season':        src['season'].fillna('—'),
         'Age':           src['age'].apply(lambda x: round(x,1) if pd.notna(x) else np.nan),
@@ -368,6 +369,7 @@ def build_scores_df(bench_df_local, source_df=None):
         'Profile':       src['__profile'],
         '_pos':          src['position'].fillna('—'),
         '_season':       src['season'].fillna('—'),
+        '_competition':  src['Competition'].fillna('—') if 'Competition' in src.columns else '—',
         '_total_minutes':src['total_minutes'].fillna(0).astype(int),
         '_age':          src['age'],
     })
@@ -450,6 +452,9 @@ with st.sidebar:
     seasons = sorted(vk['season'].dropna().unique().tolist(), reverse=True)
     sel_season = st.selectbox("Season", ["All"] + seasons)
 
+    leagues = sorted(vk['Competition'].dropna().unique().tolist())
+    sel_league = st.selectbox("League", ["All"] + leagues)
+
     positions = sorted([p for p in vk['position'].dropna().unique() if p])
     sel_pos = st.selectbox("Position", ["All"] + positions,
         format_func=lambda x: POS_EN.get(x,x) if x != "All" else "All")
@@ -481,6 +486,8 @@ else:
 df_f = vk.copy()
 if sel_season != "All":
     df_f = df_f[df_f['season'] == sel_season]
+if sel_league != "All":
+    df_f = df_f[df_f['Competition'] == sel_league]
 if sel_pos != "All":
     df_f = df_f[df_f['position'] == sel_pos]
 if sel_team != "All":
@@ -534,6 +541,8 @@ with tab1:
         result_df = all_scores_df.copy()
         if sel_season != "All":
             result_df = result_df[result_df['_season'] == sel_season]
+        if sel_league != "All":
+            result_df = result_df[result_df['_competition'] == sel_league]
         if sel_pos != "All":
             result_df = result_df[result_df['_pos'] == sel_pos]
         if sel_team != "All":
@@ -1011,6 +1020,9 @@ with tab5:
         format_func=lambda x: POS_EN.get(x,x) if x != "All" else "All",
         key="of_pos")
 
+    of_league = st.selectbox("League", ["All"] + sorted(vk['Competition'].dropna().unique().tolist()),
+        key="of_league")
+
     # Season filter
     of_season = st.selectbox("Season", ["All"] + sorted(vk['season'].dropna().unique().tolist(), reverse=True),
         key="of_season")
@@ -1030,6 +1042,8 @@ with tab5:
     # Apply filters
     if of_season != "All":
         pool_df = pool_df[pool_df['_season'] == of_season]
+    if of_league != "All":
+        pool_df = pool_df[pool_df['_competition'] == of_league]
     if of_pos != "All":
         pool_df = pool_df[pool_df['_pos'] == of_pos]
     pool_df = pool_df[pool_df['_total_minutes'] >= of_min_min]
@@ -1200,10 +1214,11 @@ with tab5:
             for req_col in ['Age','speed','burst','otip','bip','Profile']:
                 if req_col not in filtered.columns:
                     filtered[req_col] = np.nan
-            display = filtered[['Player','Team','Position','Season','Age','Minutes',
-                                'speed','burst','otip','bip','Profile']].copy()
-            display.columns = ['Player','Team','Position','Season','Age','Minutes',
-                               '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile']
+            disp_cols = [c for c in ['Player','Team','Competition','Position','Season','Age','Minutes',
+                                'speed','burst','otip','bip','Profile'] if c in filtered.columns]
+            display = filtered[disp_cols].copy()
+            display.columns = ['Player','Team','League','Position','Season','Age','Minutes',
+                               '⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP','Profile'][:len(disp_cols)]
 
             # Format numeric columns
             for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
