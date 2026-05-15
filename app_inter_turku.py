@@ -333,18 +333,19 @@ def build_scores_df(bench_df_local, source_df=None):
 
 vk, t5 = load_data()
 
-def get_scores_df(bench_source):
-    """Get cached scores — uses session_state keyed by bench_source."""
-    key = f"scores_v2_{bench_source}"
-    if key not in st.session_state:
-        if bench_source == "t5" and t5 is not None:
-            st.session_state[key] = build_scores_df(t5, vk)
-        else:
-            st.session_state[key] = build_scores_df(vk, vk)
-    return st.session_state[key]
+@st.cache_data(show_spinner="Calculating scores...")
+def calc_scores_cached_vk(data_hash):
+    return build_scores_df(vk, vk)
+
+@st.cache_data(show_spinner="Calculating scores vs Top 5...")
+def calc_scores_cached_t5(data_hash, t5_hash):
+    return build_scores_df(t5, vk)
 
 def calc_all_scores(vk_hash, bench_source, t5_hash="none"):
-    return get_scores_df(bench_source)
+    h = str(len(vk))
+    if bench_source == "t5" and t5 is not None:
+        return calc_scores_cached_t5(h, str(len(t5)))
+    return calc_scores_cached_vk(h)
 
 # ── CALC FUNCTIONS ────────────────────────────────────────────────────────────
 def calc_layer_scores(player_row, bench_df, position):
@@ -482,10 +483,11 @@ with tab1:
     if df_f.empty:
         st.info("No players match these filters.")
     else:
-        # Use pre-calculated scores
+        # Use pre-calculated scores (cached)
         bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
         t5_hash = str(len(t5)) if t5 is not None else "0"
-        all_scores_df = calc_all_scores(str(len(vk)), bench_source, t5_hash)
+        with st.spinner("Loading scores..."):
+            all_scores_df = calc_all_scores(str(len(vk)), bench_source, t5_hash)
 
         # Apply sidebar filters
         result_df = all_scores_df.copy()
