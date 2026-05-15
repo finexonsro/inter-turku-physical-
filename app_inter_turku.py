@@ -281,7 +281,26 @@ def load_data():
             df['age'] = np.nan
         return df
 
-    vk = parse_csv("veikkausliiga.csv")
+    # Load all CSVs except top5
+    import glob
+    all_csvs = sorted([f for f in glob.glob("*.csv") + glob.glob("Inter Turku App*.csv")
+                       if 'top5' not in f.lower()])
+    
+    dfs = []
+    for path in all_csvs:
+        if os.path.exists(path):
+            try:
+                dfs.append(parse_csv(path))
+            except Exception as e:
+                st.warning(f"Could not load {path}: {e}")
+    
+    if not dfs:
+        # Fallback to veikkausliiga.csv
+        vk = parse_csv("veikkausliiga.csv")
+    else:
+        vk = pd.concat(dfs, ignore_index=True).drop_duplicates(
+            subset=['Player','Team','Competition','Season','Position Group'])
+    
     t5 = parse_csv("top5.csv") if os.path.exists("top5.csv") else None
     return vk, t5
 
