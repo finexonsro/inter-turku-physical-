@@ -305,31 +305,72 @@ def load_data():
     return vk, t5
 
 def build_scores_df(bench_df_local, source_df=None):
-    """Build scores DataFrame for all VK players vs given benchmark."""
-    df_to_use = source_df if source_df is not None else vk
-    rows = []
-    for _, player in df_to_use.iterrows():
-        pos = player.get('position')
-        if not pos: continue
-        sc, _, prof = player_card(player, bench_df_local)
-        rows.append({
-            'Player':        player.get('Player','—'),
-            'Team':          player.get('Team','—'),
-            'Position':      POS_EN.get(pos,pos),
-            'Season':        player.get('season','—'),
-            'Age':           round(player.get('age', np.nan), 1) if pd.notna(player.get('age', np.nan)) else np.nan,
-            'Minutes':       int(player.get('total_minutes',0) or 0),
-            'speed':         sc.get('speed',np.nan),
-            'burst':         sc.get('burst',np.nan),
-            'otip':          sc.get('otip', np.nan),
-            'bip':           sc.get('bip',  np.nan),
-            'Profile':       prof,
-            '_pos':          pos,
-            '_season':       player.get('season','—'),
-            '_total_minutes':int(player.get('total_minutes',0) or 0),
-            '_age':          player.get('age', np.nan),
-        })
-    return pd.DataFrame(rows)
+    """Vectorized score calculation — fast even for 13k+ players."""
+    src = (source_df if source_df is not None else vk).copy()
+    metrics = get_layer_metrics()
+
+    # Pre-convert all metric columns to numeric once
+    all_metric_cols = [col for cols in metrics.values() for col, *_ in cols]
+    for col in all_metric_cols:
+        if col in src.columns:
+            src[col] = pd.to_numeric(src[col], errors='coerce')
+        if col in bench_df_local.columns:
+            bench_df_local[col] = pd.to_numeric(bench_df_local[col], errors='coerce')
+
+    # Vectorized percentile per position per metric
+    for layer, cols in metrics.items():
+        layer_metric_cols = []
+        for col, name, unit, higher_better in cols:
+            if col not in src.columns or col not in bench_df_local.columns:
+                continue
+            out_col = f"__pct_{layer}_{col[:20]}"
+            src[out_col] = np.nan
+            for pos in src['position'].dropna().unique():
+                mask_src   = src['position'] == pos
+                bench_vals = bench_df_local.loc[bench_df_local['position']==pos, col].dropna()
+                if len(bench_vals) < 3:
+                    continue
+                vals = src.loc[mask_src, col]
+                if higher_better:
+                    pcts = vals.apply(lambda v: float((bench_vals < v).sum())/len(bench_vals)*100
+                                      if pd.notna(v) else np.nan)
+                else:
+                    pcts = vals.apply(lambda v: float((bench_vals > v).sum())/len(bench_vals)*100
+                                      if pd.notna(v) else np.nan)
+                src.loc[mask_src, out_col] = pcts
+            layer_metric_cols.append(out_col)
+
+        # Layer score = mean across valid metrics
+        valid = [c for c in layer_metric_cols if c in src.columns]
+        src[f"__layer_{layer}"] = src[valid].mean(axis=1) if valid else np.nan
+
+    # Profile per row (fast apply on 4 numbers)
+    def _prof(row):
+        s = row['__layer_speed'] if pd.notna(row.get('__layer_speed')) else 0
+        b = row['__layer_burst'] if pd.notna(row.get('__layer_burst')) else 0
+        o = row['__layer_otip']  if pd.notna(row.get('__layer_otip'))  else 0
+        p = row['__layer_bip']   if pd.notna(row.get('__layer_bip'))   else 0
+        return get_profile(s, b, o, p)
+
+    src['__profile'] = src.apply(_prof, axis=1)
+
+    return pd.DataFrame({
+        'Player':        src['Player'].fillna('—'),
+        'Team':          src['Team'].fillna('—'),
+        'Position':      src['position'].map(lambda x: POS_EN.get(x,x) if x else '—'),
+        'Season':        src['season'].fillna('—'),
+        'Age':           src['age'].apply(lambda x: round(x,1) if pd.notna(x) else np.nan),
+        'Minutes':       src['total_minutes'].fillna(0).astype(int),
+        'speed':         src['__layer_speed'],
+        'burst':         src['__layer_burst'],
+        'otip':          src['__layer_otip'],
+        'bip':           src['__layer_bip'],
+        'Profile':       src['__profile'],
+        '_pos':          src['position'].fillna('—'),
+        '_season':       src['season'].fillna('—'),
+        '_total_minutes':src['total_minutes'].fillna(0).astype(int),
+        '_age':          src['age'],
+    })
 
 vk, t5 = load_data()
 
