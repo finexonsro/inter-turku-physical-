@@ -561,11 +561,11 @@ with tab1:
 
         for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
             if col in result_df.columns:
-                result_df[col] = result_df[col].apply(
-                    lambda x: int(round(x)) if pd.notna(x) else None)
+                result_df[col] = pd.to_numeric(result_df[col], errors='coerce').apply(
+                    lambda x: int(round(float(x))) if pd.notna(x) else None)
         if 'Age' in result_df.columns:
             result_df['Age'] = pd.to_numeric(result_df['Age'], errors='coerce').apply(
-                lambda x: f"{x:.1f}" if pd.notna(x) else "—")
+                lambda x: round(float(x),1) if pd.notna(x) else None)
 
         def bold_high(v):
             try:
@@ -1222,11 +1222,11 @@ with tab5:
 
             # Format numeric columns
             for col in ['⚡ Speed','🚀 Burst','🏃 OTIP','💥 BIP']:
-                display[col] = display[col].apply(
-                    lambda x: int(round(x)) if pd.notna(x) else None)
+                display[col] = pd.to_numeric(display[col], errors='coerce').apply(
+                    lambda x: int(round(float(x))) if pd.notna(x) else None)
             if 'Age' in display.columns:
                 display['Age'] = pd.to_numeric(display['Age'], errors='coerce').apply(
-                    lambda x: f"{x:.1f}" if pd.notna(x) else "—")
+                    lambda x: round(float(x),1) if pd.notna(x) else None)
 
             def bold_high(v):
                 try:
