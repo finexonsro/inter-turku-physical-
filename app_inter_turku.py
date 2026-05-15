@@ -268,7 +268,12 @@ def load_data():
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         df = df.copy()
         df['position'] = df['Position Group'].map(POS_MAP)
-        df['season']   = df['Season'].str[:4]
+        def parse_season(s):
+            s = str(s).strip()
+            if '/' in s:          # "2025/26" → take start year "2025"
+                return s.split('/')[0][:4]
+            return s[:4]          # "2025" → "2025"
+        df['season'] = df['Season'].apply(parse_season)
         df['total_minutes'] = (
             df['Minutes'].fillna(0) *
             df['Count Performances (Physical Check passed)'].fillna(0)
