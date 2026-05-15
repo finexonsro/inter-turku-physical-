@@ -357,7 +357,7 @@ def build_scores_df(bench_df_local, source_df=None):
     return pd.DataFrame({
         'Player':        src['Player'].fillna('—'),
         'Team':          src['Team'].fillna('—'),
-        'Competition':   src['Competition'].fillna('—') if 'Competition' in src.columns else '—',
+        'Competition':   src['Competition'].fillna('—') if 'Competition' in src.columns else pd.Series(['—'] * len(src), index=src.index),
         'Position':      src['position'].map(lambda x: POS_EN.get(x,x) if x else '—'),
         'Season':        src['season'].fillna('—'),
         'Age':           src['age'].apply(lambda x: round(x,1) if pd.notna(x) else np.nan),
@@ -369,7 +369,7 @@ def build_scores_df(bench_df_local, source_df=None):
         'Profile':       src['__profile'],
         '_pos':          src['position'].fillna('—'),
         '_season':       src['season'].fillna('—'),
-        '_competition':  src['Competition'].fillna('—') if 'Competition' in src.columns else '—',
+        '_competition':  src['Competition'].fillna('—') if 'Competition' in src.columns else pd.Series(['—'] * len(src), index=src.index),
         '_total_minutes':src['total_minutes'].fillna(0).astype(int),
         '_age':          src['age'],
     })
@@ -539,6 +539,8 @@ with tab1:
 
         # Apply sidebar filters
         result_df = all_scores_df.copy()
+        if '_competition' not in result_df.columns:
+            result_df['_competition'] = result_df['Competition'] if 'Competition' in result_df.columns else '—'
         if sel_season != "All":
             result_df = result_df[result_df['_season'] == sel_season]
         if sel_league != "All":
@@ -1038,6 +1040,11 @@ with tab5:
     bench_source = "t5" if sel_bench == "Top 5 2025/26" else "vk"
     t5_hash = str(len(t5)) if t5 is not None else "0"
     pool_df = calc_all_scores(str(len(vk)), bench_source, t5_hash)
+
+    # Guard: ensure _competition column exists (safety against cache/CSV edge cases)
+    if '_competition' not in pool_df.columns:
+        pool_df = pool_df.copy()
+        pool_df['_competition'] = pool_df['Competition'] if 'Competition' in pool_df.columns else '—'
 
     # Apply filters
     if of_season != "All":
