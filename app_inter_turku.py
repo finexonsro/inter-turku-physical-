@@ -472,12 +472,14 @@ with st.sidebar:
 
     st.markdown('<div class="div"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sec">Benchmark</div>', unsafe_allow_html=True)
-    bench_options = ["Veikkausliiga 2025", "Veikkausliiga All", "Top 5 2025/26", "FC Inter Turku 2025", "FC Inter Turku 2026"]
+    bench_options = ["Veikkausliiga 2026", "Veikkausliiga 2025", "Veikkausliiga All", "Top 5 2025/26", "FC Inter Turku 2025", "FC Inter Turku 2026"] 
     sel_bench = st.selectbox("Reference", bench_options)
 
 # ── BENCHMARK SELECTION ───────────────────────────────────────────────────────
-if sel_bench == "Veikkausliiga 2025":
-    bench_df = vk[vk['season'] == '2025']
+if sel_bench == "Veikkausliiga 2026":
+    bench_df = vk[vk['season'] == '2026']
+elif sel_bench == "Veikkausliiga 2025":
+    bench_df = vk[vk['season'] == '2025'] 
 elif sel_bench == "Top 5 2025/26" and t5 is not None:
     bench_df = t5
 elif sel_bench == "FC Inter Turku 2025":
