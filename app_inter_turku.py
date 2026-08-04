@@ -137,8 +137,7 @@ def get_profile(s,b,o,p):
 def get_layer_metrics():
     return {
         "speed": [
-            ("PSV-99",                                    "PSV-99",              "km/h", True),
-            ("TOP 5 PSV-99",                              "Top 5 PSV-99",        "km/h", True),
+            ("TOP 3 Peak Velocity",                       "TOP 3 Peak Velocity", "km/h", True),
             ("Sprint Distance P90",                       "Sprint Distance P90", "m",    True),
             ("HSR Distance P90",                          "HSR Distance P90",    "m",    True),
         ],
@@ -153,12 +152,14 @@ def get_layer_metrics():
             ("HSR Distance OTIP P30OTIP",                 "HSR Dist P30OTIP",    "m",    True),
             ("HSR Count OTIP P30OTIP",                    "HSR Count P30OTIP",   "#",    True),
             ("Explosive Acceleration to Sprint Count OTIP P30OTIP", "Exp Acc Sprint OTIP", "#", True),
+            ("Explosive Acceleration to HSR Count OTIP P30OTIP", "Exp Acc HSR OTIP", "#", True),
         ],
         "bip": [
             ("Sprint Distance P60BIP",                    "Sprint Dist P60BIP",  "m",    True),
             ("HSR Distance P60BIP",                       "HSR Dist P60BIP",     "m",    True),
             ("HSR Count P60BIP",                          "HSR Count P60BIP",    "#",    True),
             ("Explosive Acceleration to Sprint Count P60BIP", "Exp Acc Sprint BIP", "#", True),
+            ("Explosive Acceleration to HSR Count P60BIP", "Exp Acc HSR BIP", "#", True),
         ],
     }
 
