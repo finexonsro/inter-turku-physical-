@@ -674,7 +674,7 @@ with tab2:
     # Layer breakdown + Radar
     bc1, bc2 = st.columns([1,1])
     with bc1:
-        for layer in ['speed','burst']:
+        for layer in ['speed','otip']:
             color = LAYER_COLORS[layer]
             data  = all_data.get(layer,[])
             sc    = scores.get(layer,0) or 0
@@ -697,7 +697,7 @@ with tab2:
             """, unsafe_allow_html=True)
 
     with bc2:
-        for layer in ['otip','bip']:
+        for layer in ['burst','bip']:
             color = LAYER_COLORS[layer]
             data  = all_data.get(layer,[])
             sc    = scores.get(layer,0) or 0
@@ -924,7 +924,7 @@ with tab4:
                 # Layer breakdown — same layout as Player Profile
                 bc1, bc2 = st.columns([1,1])
                 with bc1:
-                    for layer in ['speed','burst']:
+                    for layer in ['speed','otip']:
                         color = LAYER_COLORS[layer]
                         data  = all_data_a.get(layer,[])
                         sc    = scores_a.get(layer,0) or 0
@@ -946,7 +946,7 @@ with tab4:
                         """, unsafe_allow_html=True)
 
                 with bc2:
-                    for layer in ['otip','bip']:
+                    for layer in ['burst','bip']:
                         color = LAYER_COLORS[layer]
                         data  = all_data_a.get(layer,[])
                         sc    = scores_a.get(layer,0) or 0
