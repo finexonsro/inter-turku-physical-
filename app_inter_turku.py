@@ -112,12 +112,12 @@ LEVEL_MAP = [
 ]
 
 PROFILES = [
-    ("🔥 Complete Athlete",  lambda s,b,o,p: all(x>=65 for x in [s,b,o,p])),
-    ("🧱 Wrecking Ball",     lambda s,b,o,p: o>=85 and b>=65),
-    ("⚡ Speed Demon",       lambda s,b,o,p: s>=85),
-    ("💪 Work Horse",        lambda s,b,o,p: p>=85 and o>=65),
-    ("🚀 Raw Athlete",       lambda s,b,o,p: b>=85 and s>=65),
-    ("👀 Emerging Talent",   lambda s,b,o,p: max(s,b,o,p)>=75),
+    ("🔥 Elite Athlete",     lambda s,b,o,p: all(x>=65 for x in [s,b,o,p])),
+    ("🧱 Defensive Engine",  lambda s,b,o,p: o>=85 and b>=65),
+    ("⚡ Top Speed",         lambda s,b,o,p: s>=85),
+    ("💪 Engine",            lambda s,b,o,p: p>=85 and o>=65),
+    ("🚀 Explosive",         lambda s,b,o,p: b>=85 and s>=65),
+    ("👀 One to Watch",      lambda s,b,o,p: max(s,b,o,p)>=75),
     ("—",                    lambda s,b,o,p: True),
 ]
 
@@ -133,6 +133,18 @@ def get_profile(s,b,o,p):
             if fn(s,b,o,p): return label
         except: continue
     return "—"
+
+def speed_flag(peak_velocity):
+    """TOP 3 Peak Velocity → Speed-Badge. Cutoffs kalibriert gegen DACH-Pool (n=1.032)."""
+    try:
+        v = float(peak_velocity)
+        if v >= 33.7:   return "🔥 Elite"
+        elif v >= 32.9: return "✅ Strong"
+        elif v >= 32.0: return "🟡 Solid"
+        elif v >= 31.0: return "🔵 Fair"
+        else:           return "⚫ Weak"
+    except:
+        return "—"
 
 def get_layer_metrics():
     return {
@@ -626,6 +638,9 @@ with tab2:
     mins    = int(player_row.get('total_minutes',0) or 0)
     age_val = player_row.get('age', np.nan)
     age_str = f"{age_val:.1f} yrs" if pd.notna(age_val) else "—"
+    pv_val  = player_row.get('TOP 3 Peak Velocity', None)
+    pv_str  = f"{float(pv_val):.2f} km/h" if pv_val is not None and pd.notna(pv_val) else "—"
+    pv_flag = speed_flag(pv_val) if pv_val is not None and pd.notna(pv_val) else "—"
     st.markdown(f"""
     <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
                 border-radius:4px;padding:14px 18px;margin-bottom:16px;">
@@ -641,7 +656,8 @@ with tab2:
                     {POS_EN.get(pos,pos or '—')} &nbsp;·&nbsp;
                     {age_str} &nbsp;·&nbsp;
                     {player_row.get('season','—')} &nbsp;·&nbsp;
-                    {mins} min total
+                    {mins} min total &nbsp;·&nbsp;
+                    ⚡ <b style="color:{WHITE};">{pv_str}</b> &nbsp;{pv_flag}
                 </div>
             </div>
             <div class="profile-badge">{profile}</div>
@@ -883,6 +899,9 @@ with tab4:
                 # Header — same as Player Profile
                 age_a = a_row.get('age', np.nan)
                 age_str_a = f"{age_a:.1f} yrs" if pd.notna(age_a) else "—"
+                pv_val_a  = a_row.get('TOP 3 Peak Velocity', None)
+                pv_str_a  = f"{float(pv_val_a):.2f} km/h" if pv_val_a is not None and pd.notna(pv_val_a) else "—"
+                pv_flag_a = speed_flag(pv_val_a) if pv_val_a is not None and pd.notna(pv_val_a) else "—"
                 st.markdown(f"""
                 <div style="background:{CARD};border:1px solid #2A2A2A;border-left:4px solid {BLUE};
                             border-radius:4px;padding:14px 18px;margin-bottom:16px;">
@@ -893,7 +912,7 @@ with tab4:
                             <div style="font-size:11px;color:{MUTED};margin-top:3px;">
                                 {a_row.get('Team','—')} · {a_row.get('Competition','—')} ·
                                 {POS_EN.get(pos,pos or '—')} · {age_str_a} · {a_row.get('season','—')} ·
-                                {mins_a} min total
+                                {mins_a} min total · ⚡ <b style="color:{WHITE};">{pv_str_a}</b> &nbsp;{pv_flag_a}
                             </div>
                         </div>
                         <div class="profile-badge">{prof_a}</div>
@@ -1290,12 +1309,12 @@ with tab6:
     with lc2:
         st.markdown('<div class="sec">Player Profiles</div>', unsafe_allow_html=True)
         profile_desc = {
-            "🔥 Complete Athlete":  "All four layers ≥ 65th percentile. Dominant across every physical dimension.",
-            "🧱 Wrecking Ball":     "OTIP ≥ 85 + Burst ≥ 65. Elite defensive transition athlete — the Baleba profile.",
-            "⚡ Speed Demon":       "Speed ≥ 85. Exceptional athletic ceiling. Highest top-end velocity.",
-            "💪 Work Horse":        "BIP ≥ 85 + OTIP ≥ 65. Relentless active participation in live play.",
-            "🚀 Raw Athlete":       "Burst ≥ 85 + Speed ≥ 65. Elite explosive activation — high physical potential.",
-            "👀 Emerging Talent":   "At least one layer ≥ 75. Identifiable physical edge worth monitoring.",
+            "🔥 Elite Athlete":     "All four layers ≥ 65th percentile. Dominant across every physical dimension.",
+            "🧱 Defensive Engine":  "OTIP ≥ 85 + Burst ≥ 65. Elite defensive transition athlete — the Baleba profile.",
+            "⚡ Top Speed":         "Speed ≥ 85. Exceptional athletic ceiling. Highest top-end velocity.",
+            "💪 Engine":            "BIP ≥ 85 + OTIP ≥ 65. Relentless active participation in live play.",
+            "🚀 Explosive":         "Burst ≥ 85 + Speed ≥ 65. Elite explosive activation — high physical potential.",
+            "👀 One to Watch":      "At least one layer ≥ 75. Identifiable physical edge worth monitoring.",
         }
         for profile, desc in profile_desc.items():
             st.markdown(f"""
